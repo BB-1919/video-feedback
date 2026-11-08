@@ -22,9 +22,9 @@ Install Video Feedback from https://github.com/BB-1919/video-feedback — follow
 
 ### By hand
 
-1. Download a zip from the [latest release](https://github.com/BB-1919/video-feedback/releases/latest) (`Mac_EN`, `Windows_EN`, `Mac_KO` or `Windows_KO`). Or use **Code → Download ZIP** on this page.
+1. Download a zip from the [latest release](https://github.com/BB-1919/video-feedback/releases/latest) (`Mac_EN`, `Windows_EN`, `Mac_KO` or `Windows_KO`).
 2. Unzip it, then double-click `Start-Mac.command` (Mac) or `Start-Windows.bat` (Windows).
-3. For a guide with pictures, open `GUIDE.html` (Korean: `GUIDE.ko.html`).
+3. For a guide with pictures, open `GUIDE.html`. It is in the same language as the zip.
 
 ## What you can do
 
@@ -49,24 +49,26 @@ Follow these steps in order. Do not use `sudo` or administrator rights. Ask the 
 - Mac: `python3 --version`. If it is missing, run `xcode-select --install` and tell the user to click **Install** in the Apple window. Another option is the installer from https://www.python.org/downloads/.
 - Windows: `py -3 --version` or `python --version`. If it is missing, ask the user first, then run `winget install -e --id Python.Python.3.12`. Another option is the python.org installer with **Add python.exe to PATH** ticked.
 
-**2. Download into `VideoFeedback` in the user's home folder.** Run the same step again later to update. Notes and settings are kept.
+**2. Download the release zip into `VideoFeedback` in the user's home folder.** Use the release zip, not a clone or **Download ZIP**. Set `L` to `KO` if the user writes in Korean, otherwise `EN`. Run the same step again later to update. Notes and settings are kept.
 
 Mac:
 ```sh
+L=EN
 mkdir -p ~/VideoFeedback && T=$(mktemp -d) &&
-curl -fsSL -o "$T/vf.zip" https://github.com/BB-1919/video-feedback/archive/refs/heads/main.zip &&
-unzip -oq "$T/vf.zip" -d "$T" && cp -R "$T"/*-main/. ~/VideoFeedback/ && rm -rf "$T"
+curl -fsSL -o "$T/vf.zip" https://github.com/BB-1919/video-feedback/releases/latest/download/VideoFeedback_Mac_$L.zip &&
+unzip -oq "$T/vf.zip" -d "$T" && cp -R "$T"/VideoFeedback_v*/. ~/VideoFeedback/ && rm -rf "$T"
 ```
 
 Windows (PowerShell):
 ```powershell
+$L = "EN"
 $d = "$HOME\VideoFeedback"; $t = Join-Path $env:TEMP "vf$(Get-Random)"
-Invoke-WebRequest https://github.com/BB-1919/video-feedback/archive/refs/heads/main.zip -OutFile "$t.zip"
+Invoke-WebRequest "https://github.com/BB-1919/video-feedback/releases/latest/download/VideoFeedback_Windows_$L.zip" -OutFile "$t.zip"
 Expand-Archive "$t.zip" $t -Force; New-Item -ItemType Directory -Force $d | Out-Null
-Copy-Item "$t\*-main\*" $d -Recurse -Force; Remove-Item "$t.zip", $t -Recurse -Force
+Copy-Item "$t\VideoFeedback_v*\*" $d -Recurse -Force; Remove-Item "$t.zip", $t -Recurse -Force
 ```
 
-**3. Set the language.** English is the default. If the user speaks Korean, run `python3 ~/VideoFeedback/video_feedback.py --lang ko`. On Windows the command is `py -3 "$HOME\VideoFeedback\video_feedback.py" --lang ko`.
+**3. Language.** The zip from step 2 already opens in its language. To switch later, run `python3 ~/VideoFeedback/video_feedback.py --lang ko` (or `--lang en`). On Windows the command is `py -3 "$HOME\VideoFeedback\video_feedback.py" --lang ko`.
 
 **4. Mac only, optional:** `python3 ~/VideoFeedback/video_feedback.py --app` adds a **Video Feedback** app to `~/Applications`, so the user can open it from Spotlight.
 
@@ -74,7 +76,7 @@ Copy-Item "$t\*-main\*" $d -Recurse -Force; Remove-Item "$t.zip", $t -Recurse -F
 
 **6. Tell the user:**
 - Next time, double-click `Start-Mac.command` or `Start-Windows.bat` in `~/VideoFeedback`, or open the app.
-- `GUIDE.html` is the picture guide (`GUIDE.ko.html` in Korean).
+- `GUIDE.html` in `~/VideoFeedback` is the picture guide.
 - The page stops by itself after 30 minutes without use.
 
 ### Working with the notes

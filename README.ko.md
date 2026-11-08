@@ -22,9 +22,9 @@ https://github.com/BB-1919/video-feedback 에서 영상 피드백을 설치해 �
 
 ### 직접 받기
 
-1. [최신 배포](https://github.com/BB-1919/video-feedback/releases/latest)에서 압축 파일 하나를 받습니다(`Mac_KO` 또는 `Windows_KO`). 이 페이지의 **Code → Download ZIP** 으로 받아도 됩니다.
+1. [최신 배포](https://github.com/BB-1919/video-feedback/releases/latest)에서 압축 파일 하나를 받습니다(`Mac_KO` 또는 `Windows_KO`).
 2. 압축을 풀고 `Start-Mac.command`(맥) 또는 `Start-Windows.bat`(윈도우)을 두 번 누릅니다.
-3. 사진이 있는 설명서는 `GUIDE.html`(받은 압축이 한국어판일 때)이나 `GUIDE.ko.html` 을 엽니다.
+3. 사진이 있는 설명서는 `GUIDE.html` 을 엽니다(받은 압축과 같은 말).
 
 ## 할 수 있는 일
 
@@ -43,7 +43,7 @@ https://github.com/BB-1919/video-feedback 에서 영상 피드백을 설치해 �
 
 ## 설치 순서 (AI 용)
 
-AI 가 따라 할 순서는 [README.md](README.md) 의 **For AI assistants** 에 있습니다. 한국어로 쓸 때는 3번에서 `--lang ko` 를 실행하면 됩니다.
+AI 가 따라 할 순서는 [README.md](README.md) 의 **For AI assistants** 에 있습니다. 한국어로 쓸 때는 2번에서 `L=KO` 로 받으면 처음부터 한국어 화면입니다.
 
 지우려면 `~/VideoFeedback` 폴더와 `~/.video-feedback` 폴더를 지웁니다. 맥에서 앱을 만들었으면 README.md 의 **Uninstall** 순서도 따릅니다.
 
