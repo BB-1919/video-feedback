@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>영상 피드백</title>
+<style>
+:root{--bg:#f3f4f6;--panel:#fff;--fg:#1c2230;--sub:#667085;--faint:#a3abb8;--line:#dfe3ea;--chip:#eef1f6;--acc:#e5484d;--acc2:#2f6fde;--ok:#18864f;--okbg:#e5f5ec;--gl:#7b4fd6;--glbg:#f1ebff;--sel:#fff1cc;--rng:rgba(47,111,222,.28);--shade:rgba(10,12,18,.45);color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#121419;--panel:#1b1e25;--fg:#e7e9ef;--sub:#98a1b0;--faint:#5d6574;--line:#2b303a;--chip:#252a34;--acc:#ff6a70;--acc2:#6ea2ff;--ok:#40cc8b;--okbg:#14301f;--gl:#b49aff;--glbg:#2a2140;--sel:#3a321c;--rng:rgba(110,162,255,.3);--shade:rgba(0,0,0,.6);color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}   /* video{display:block} 가 숨김을 이겨 빈 재생기가 보이던 것 */
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif}
+button{font:inherit;color:inherit;background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--sub)}
+button.main{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+kbd{font:11px/1.4 ui-monospace,SFMono-Regular,monospace;background:var(--chip);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:var(--fg)}
+button kbd{margin-left:4px;opacity:.75}
+button.main kbd{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.35);color:#fff}
+header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:17px}
+.grow{flex:1}
+.fbtn{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.fbtn button{font-size:13px;padding:5px 8px}
+#find{grid-column:1/-1}
+#where{color:var(--sub);font-size:11.5px;word-break:break-all;margin:0 2px 8px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+#ver{background:none;border:0;padding:2px 4px;color:var(--faint);font-size:13px;line-height:1}
+#ver:hover{color:var(--sub)}
+.g{display:grid;grid-template-columns:250px minmax(0,1fr) 360px;gap:12px;padding:12px 16px;align-items:start}
+@media (max-width:1150px){.g{grid-template-columns:minmax(0,1fr)}#files{max-height:240px}}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;min-width:0}
+#files{max-height:calc(100vh - 90px);overflow:auto;position:sticky;top:12px}
+#files h3{margin:2px 0 8px;font-size:13px;color:var(--sub);font-weight:600}
+#sort{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg);cursor:pointer}
+.f{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 8px;border-radius:7px;word-break:break-all}
+.f:hover{background:var(--chip)}
+.f.cur{background:var(--sel);font-weight:700}
+.f small{display:block;color:var(--sub);font-weight:400;font-size:11px}
+.f b.n{color:var(--acc);font-weight:700}
+/* 여러 영상 고르기(⇧G · v1.4.6) */
+#multi{grid-column:1/-1}
+#multi[aria-pressed="true"]{border-color:var(--gl);color:var(--gl);font-weight:700}
+#mbar{display:grid;gap:6px;margin:0 0 8px;padding:8px;border:1px solid var(--gl);border-radius:10px;background:var(--glbg)}
+#mbar .row button{font-size:12.5px;padding:4px 8px}
+#mbar button:disabled{opacity:.5;cursor:default}
+.f .cb{display:inline-grid;place-items:center;width:17px;height:17px;margin-right:6px;border:1px solid var(--sub);border-radius:4px;background:var(--panel);color:transparent;font-size:11px;vertical-align:-3px}
+.f.on{background:var(--glbg)}
+.f.on .cb{background:var(--gl);border-color:var(--gl);color:#fff}
+#mwl{max-height:150px;overflow:auto;color:var(--sub);font-size:12.5px;word-break:break-all}
+#mmsg{font-weight:600}
+#mmsg.bad{color:var(--acc)}
+#stage,#mod-v{display:grid;gap:10px}
+video{width:100%;max-height:64vh;background:#000;border-radius:10px;display:block}
+
+.sp{display:none}
+.popb{padding:2px 7px;font-size:12px;line-height:1.35}
+#files h3{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+#files h3 .popb,#list .popb,#memo .popb{margin-left:auto}
+.ph{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--sub);border-style:dashed}
+.ph button{font-size:12.5px;padding:4px 9px}
+#pops{display:flex;gap:6px;flex-wrap:wrap}
+#pops button{font-size:12.5px;padding:4px 9px;border-color:var(--acc2);color:var(--acc2)}
+#hmsg{font-weight:600;color:var(--acc)}
+body.pop{height:100vh;display:flex;flex-direction:column;gap:8px;padding:8px;overflow:hidden}
+.phd{flex:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--sub)}
+.phd b{color:var(--fg)}
+.phd button{font-size:12.5px;padding:3px 9px}
+body.pop>#mod-v,body.pop>#files,body.pop>#list{flex:1 1 0;min-height:0}
+body.pop>#mod-v{display:flex;flex-direction:column;gap:8px}
+body.pop #mod-v>*{flex:none}
+body.pop #vbox{flex:1 1 0;min-height:0;display:flex;flex-direction:column;padding:6px}
+body.pop #vbox video{flex:1 1 0;min-height:0;max-height:none;height:100%;object-fit:contain}
+body.pop #vbox #empty{margin:auto}
+body.pop>#files,body.pop>#list{max-height:none;position:static;overflow:auto}
+body.pop>#list{align-content:start}
+body.pop .popb{display:none}   /* 띄운 창에서는 머리 줄의 «↩ 원래 자리로» */
+#memo.guest{position:fixed;left:8px;right:8px;bottom:8px;z-index:5;box-shadow:0 12px 34px rgba(0,0,0,.45)}   /* 띄운 창에서 M — 메모 칸이 잠깐 그 창으로 */
+.toast{position:fixed;left:50%;top:46px;transform:translateX(-50%);max-width:90vw;background:var(--fg);color:var(--bg);padding:7px 13px;border-radius:9px;font-size:13px;z-index:9;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+
+@media (min-width:1151px){
+  html,body{height:100%}
+  body{display:flex;flex-direction:column}
+  header{flex:none}
+  .g{flex:1;min-height:0;grid-template-rows:minmax(0,1fr);align-items:stretch}
+  #files,#list{max-height:none;position:static;min-height:0}
+  #list{align-content:start}
+  #stage{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
+  #stage>*{flex:none}
+  #stage>#mod-v{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:8px}
+  #mod-v>*{flex:none}
+  #mod-v>#vbox{flex:1 1 0;min-height:200px;display:flex;flex-direction:column;padding:6px}
+  #vbox video{flex:1 1 0;min-height:0;max-height:none;height:100%;object-fit:contain}
+  #vbox #empty{margin:auto}
+  /* 칸 사이 세로 줄 — 끌면 너비 · 끝까지 밀면 접힘 · 누르면 다시 폄 · 두 번 누르면 처음 너비 */
+  .g{gap:0;grid-template-columns:var(--wl,250px) 12px minmax(360px,1fr) 12px var(--wr,360px)}
+  .g>[data-col=l]{grid-column:1}#spl{grid-column:2}#stage{grid-column:3}#spr{grid-column:4}.g>[data-col=r]{grid-column:5}
+  .g>*{grid-row:1}
+  .g.nol{--wl:0px}.g.nor{--wr:0px}
+  .g.nol>[data-col=l],.g.nor>[data-col=r]{display:none}
+  .sp{display:block;position:relative;cursor:col-resize;touch-action:none}
+  .sp::after{content:"";position:absolute;top:8px;bottom:8px;left:5px;width:2px;border-radius:2px}
+  .sp:hover::after,.sp.drag::after{background:var(--acc2)}
+  .sp.shut{cursor:pointer;background:var(--chip);border-radius:6px}
+  .sp.shut::before{content:attr(data-a);position:absolute;top:45%;left:0;right:0;text-align:center;color:var(--sub);font-weight:700}
+}
+/* 영상 아래 단추들 — 글씨는 그대로, 상자 여백·단축키 표시만 조금 작게 */
+#mod-v .row button,#memo .row button{padding:4px 8px}
+#mod-v .row button kbd,#memo .row button kbd{font-size:10px;padding:0 3px;margin-left:3px}
+#mod-v>.box.row,#memo{padding:8px}
+#empty{padding:50px 20px;text-align:center;color:var(--sub)}
+#bar{position:relative;height:26px;background:var(--chip);border-radius:6px;cursor:pointer;overflow:hidden}
+#bar .rg{position:absolute;top:0;bottom:0;background:var(--rng)}
+#bar .tk{position:absolute;top:3px;bottom:3px;width:3px;margin-left:-1px;background:var(--acc);border-radius:2px}
+#bar .tk.ok{background:var(--ok)}
+#bar .tk.sl{width:5px;margin-left:-2px;background:var(--acc2)}
+#bar .seg{position:absolute;top:8px;height:10px;background:var(--acc);opacity:.45;border-radius:3px}
+#bar .seg.ok{background:var(--ok)}
+#bar .hd{position:absolute;top:0;bottom:0;width:2px;background:var(--fg)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#tm{font-variant-numeric:tabular-nums;font-weight:700;min-width:120px}
+#rng{color:var(--acc2);font-weight:600}
+#memo{display:grid;gap:6px}
+#memo.gl{border-color:var(--gl);box-shadow:0 0 0 1px var(--gl) inset}
+#at{font-weight:700}
+#at .t{color:var(--acc)}
+#at .w{color:var(--gl)}
+#cats[hidden]{display:none}
+.cat{padding:3px 9px;font-size:12px;border-radius:999px}
+.cat[aria-pressed="true"]{background:var(--gl);border-color:var(--gl);color:#fff}
+.cat kbd{font-size:10px}
+textarea,#pq{width:100%;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+textarea{min-height:64px;resize:vertical}
+textarea:focus,#pq:focus{outline:2px solid var(--acc2);outline-offset:-1px}
+.keys{color:var(--sub);font-size:12px;margin:0}
+#list{max-height:calc(100vh - 90px);overflow:auto;position:sticky;top:12px;display:grid;gap:8px}
+#cnt{color:var(--sub);font-size:12px}
+ol{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+li.it{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:grid;gap:4px;cursor:pointer}
+li.it.near{border-color:var(--acc)}
+li.it.whole{border-color:var(--gl);background:var(--glbg)}
+li.it.sel{box-shadow:0 0 0 2px var(--acc2) inset;border-color:var(--acc2)}
+li.it.done{background:var(--okbg)}
+li.it .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+li.it .ts{color:var(--acc2);font-weight:700;font-variant-numeric:tabular-nums}
+li.it.whole .ts{color:var(--gl)}
+li.it .tag{font-size:11px;background:var(--gl);color:#fff;border-radius:999px;padding:0 7px}
+li.it .no{color:var(--sub);font-size:12px}
+li.it .tx{white-space:pre-wrap;word-break:break-word}
+li.it .dn{color:var(--ok);font-size:12px}
+li.it .warn{color:var(--acc);font-size:12px;font-weight:700}
+li.it .act{display:flex;gap:4px;margin-left:auto}
+li.it .act button{padding:2px 7px;font-size:12px}
+#file{color:var(--sub);font-size:11px;word-break:break-all;margin:0}
+#newv{background:var(--sel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+#msg{color:var(--acc);font-weight:600}
+.err{color:var(--acc);font-weight:600}
+/* 덮는 창(찾기 · 내보내기 · 단축키) */
+.ov{position:fixed;inset:0;background:var(--shade);display:flex;align-items:flex-start;justify-content:center;padding:9vh 16px 16px;z-index:10}
+.ov[hidden]{display:none}
+.pbox,.ebox,.hbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.pbox{width:min(640px,100%);max-height:76vh;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:8px;padding:12px}
+#ppath{color:var(--sub);font-size:12px;word-break:break-all}
+#pl{overflow:auto;gap:2px}
+#pl li{padding:7px 10px;border-radius:8px;cursor:pointer;word-break:break-all}
+#pl li.on{background:var(--acc2);color:#fff}
+#pl li.on small{color:#fff}
+#pl li small{color:var(--sub)}
+#pl li.pup{color:var(--sub);font-size:12px}
+#pl li.pnone{color:var(--sub);cursor:default}
+.ebox{width:min(620px,100%);max-height:82vh;overflow:auto;padding:16px;display:grid;gap:10px}
+.ebox h2,.hbox h2{margin:0;font-size:17px}
+.ebox h2 small,.hbox h2 small{font-weight:400}
+.eo{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;text-align:left;padding:10px 12px;border-radius:10px;width:100%}
+.eo kbd{grid-row:span 2;align-self:center;font-size:13px;padding:2px 7px}
+.eo b{font-size:15px}
+.eo small{color:var(--sub)}
+.eo.first{border-color:var(--acc2);box-shadow:0 0 0 1px var(--acc2) inset}
+.eo.back{display:block;width:auto;padding:5px 10px}
+.eout{border-radius:10px;padding:10px 12px;background:var(--okbg);display:grid;gap:6px}
+.eout[hidden]{display:none}
+.eout pre{margin:0;white-space:pre-wrap;word-break:break-all;font:12px/1.5 ui-monospace,SFMono-Regular,monospace;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;max-height:220px;overflow:auto}
+.eout.bad{background:var(--sel)}
+.hstep{display:grid;gap:8px}
+.hcopy{border-radius:10px;padding:9px 12px;background:var(--okbg);display:grid;gap:4px}
+.hcopy.bad{background:var(--sel)}
+.hcopy summary{cursor:pointer;color:var(--sub);font-size:12px}
+.hcopy pre{margin:4px 0 0;white-space:pre-wrap;word-break:break-all;font:12px/1.5 ui-monospace,SFMono-Regular,monospace;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;max-height:200px;overflow:auto;user-select:all}
+#horoute{display:flex;flex-wrap:wrap;gap:2px 12px}
+.ht{display:flex;gap:8px;align-items:baseline;text-align:left;padding:7px 10px;width:100%;background:none}
+.ht .rd,.hc .rd{color:var(--faint);font-size:13px}
+.ht small{color:var(--sub);min-width:0;word-break:break-all}
+.ht.on{border-color:var(--acc2);box-shadow:0 0 0 1px var(--acc2) inset;background:var(--chip)}
+.ht.on .rd,.hc.on .rd{color:var(--acc2)}
+.hv{border:1px solid var(--line);border-radius:10px;padding:7px 10px;display:grid;gap:6px}
+.hv.on{border-color:var(--acc2);box-shadow:0 0 0 1px var(--acc2) inset}
+.hvh{display:grid;gap:2px;text-align:left;width:100%;border:0;background:none;padding:0}
+.hvh .nm{font-weight:700;word-break:break-all}
+.hvh .to{color:var(--acc2);font-size:13px;min-width:0;word-break:break-all}
+.hvh .to small{color:var(--sub)}
+.hcs{display:flex;flex-wrap:wrap;gap:5px}
+.hc{display:inline-flex;gap:5px;align-items:baseline;padding:4px 9px;font-size:13px;border-radius:999px;background:none}
+.hc small{color:var(--sub)}
+.hc.on{border-color:var(--acc2);background:var(--chip);font-weight:700}
+.hfoot{position:sticky;bottom:0;background:var(--panel);padding-top:8px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#hocmd,#hocus{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 6px}
+li.it .pk{width:20px;height:20px;padding:0;border-radius:5px;font-size:12px;line-height:1;background:var(--panel);color:transparent}
+li.it .pk.on{background:var(--acc);border-color:var(--acc);color:#fff}
+li.it.pkd{border-color:var(--acc);background:var(--sel)}
+#delrow:empty{display:none}
+button.warn{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+li.it .sent{color:var(--acc2);font-size:12px}
+.hbox{width:min(780px,100%);max-height:82vh;overflow:auto;padding:16px 18px}
+.hcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 22px;margin-top:10px}
+.hcols h3{margin:0 0 6px;font-size:13px;color:var(--sub)}
+.hcols dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 10px;align-items:baseline}
+.hcols dt{white-space:nowrap}
+.hcols dd{margin:0}
+.abox{width:min(560px,100%);font-size:13px}
+.abox h3{margin:14px 0 4px;font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.06em}
+.abox p{margin:0}
+.abox ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.abox small{color:var(--sub)}
+#langs [aria-pressed="true"]{border-color:var(--acc2);color:var(--acc2);font-weight:700}
+.abox pre{margin:6px 0 0;padding:6px 8px;background:var(--chip);border-radius:6px;font:11.5px/1.5 ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap;word-break:break-all;user-select:all}
+</style></head><body>
+<header><h1>🎬 영상 피드백</h1><span id="pops"></span><span id="hmsg"></span><span class="grow"></span><button id="upd" type="button" class="main" hidden></button><button id="hk" type="button">⌨ 단축키<kbd>?</kbd></button>
+<button id="ver" type="button" title="About" aria-label="About">ⓘ</button></header>
+<div class="g">
+  <aside class="box" id="files" data-col="l">
+    <div class="fbtn"><button id="find" type="button">🔎 영상·폴더 찾기<kbd>F</kbd></button><button id="up" type="button">↑ 위 폴더<kbd>⌫</kbd></button><button id="pick" type="button">📁 폴더 창<kbd>⇧F</kbd></button>
+      <button id="multi" type="button" aria-pressed="false">☑ 여러 영상에 한꺼번에 메모<kbd>⇧G</kbd></button></div>
+    <div id="where" class="notr"></div>
+    <div id="mbar" hidden><b id="mcnt"></b>
+      <div class="row"><button id="mall" type="button" data-m="all"></button><button type="button" data-m="none">고르기 풀기</button><button type="button" data-m="end">끝내기<kbd>Esc</kbd></button></div>
+      <button id="mwrite" type="button" class="main" data-m="write"></button>
+      <p class="keys" data-en="Click a video to pick or unpick it (hold <kbd>⇧</kbd> to pick everything in between). You can go to other folders and pick more.">영상을 누르면 고르기 · 풀기 (<kbd>⇧</kbd> 누른 채 누르면 사이를 한꺼번에). 다른 폴더로 가서 더 골라도 됩니다.</p></div>
+    <h3>폴더 · 영상 <select id="sort" title="왼쪽 목록 정렬"><option value="최근">최근 영상순</option><option value="이름">이름순</option><option value="오래된">오래된 순</option></select> · <kbd>[</kbd><kbd>]</kbd> 이전·다음 영상<button class="popb" type="button" data-pop="f" title="이 칸을 따로 띄운 창으로 — 다른 모니터로 끌어 옮길 수 있습니다">⧉</button></h3><div id="fl"></div></aside>
+  <div class="sp" id="spl" data-s="l" data-a="›" title="끌어서 칸 너비 조절 · 끝까지 밀면 접힘 · 두 번 누르면 처음 너비"></div>
+  <section id="stage">
+   <div class="mod" id="mod-v">
+    <div id="newv" hidden>영상이 새로 바뀌었습니다(고친 판). <button id="reload" type="button" class="main">다시 불러오기<kbd>R</kbd></button></div>
+    <div class="box" id="vbox"><div id="empty" data-en="Press <kbd>F</kbd> to pick a video (or click one on the left)"><kbd>F</kbd> 를 눌러 영상을 고르세요 (왼쪽에서 눌러도 됩니다)</div><video id="vid" controls preload="metadata" tabindex="-1" hidden></video></div>
+    <div id="bar" title="누르면 그 자리로"></div>
+    <div class="box row">
+      <button id="b2" type="button">◀ 2초<kbd>←</kbd></button><button id="pp" type="button">▶ 재생<kbd>Space</kbd></button><button id="f2" type="button">2초 ▶<kbd>→</kbd></button>
+      <button id="b01" type="button">◀ 0.1<kbd>⇧←</kbd></button><button id="f01" type="button">0.1 ▶<kbd>⇧→</kbd></button>
+      <span id="tm">0:00.0 / 0:00.0</span>
+      <button id="spd" type="button">속도 1×<kbd>S</kbd></button>
+      <button class="popb" type="button" data-pop="v" title="영상을 따로 띄운 창으로 — 다른 모니터로 끌어 옮기고 크게 볼 수 있습니다">⧉ 영상 따로 띄우기<kbd>W</kbd></button>
+    </div>
+   </div>
+    <div class="box" id="memo">
+      <div class="row"><button id="mk" type="button" data-en="📍 Mark at <span id=&quot;mkt&quot;>0:00</span><kbd>M</kbd>">📍 <span id="mkt">0:00</span>에 마크<kbd>M</kbd></button>
+        <button id="ia" type="button">[ 구간 시작<kbd>I</kbd></button><button id="ib" type="button">구간 끝 ]<kbd>O</kbd></button><button id="ic" type="button">구간 지우기<kbd>X</kbd></button>
+        <button id="gb" type="button">🌐 영상 전체 메모<kbd>G</kbd></button><span id="rng"></span><button class="popb" type="button" data-pop="m" title="메모 쓰기 칸을 따로 띄운 창으로">⧉</button></div>
+      <label id="at" for="txt">이 장면에 메모 · <span class="t">0:00.0</span></label>
+      <div class="row" id="cats" hidden></div>
+      <textarea id="txt" placeholder="어떻게 고칠지 적으세요 — 쓰기 시작하면 영상이 멈추고 그 시간이 붙습니다"></textarea>
+      <div class="row"><button id="save" type="button" class="main">남기기<kbd>Enter</kbd></button><button id="cancel" type="button">쓰던 것 지우기<kbd>Esc</kbd></button><span id="msg"></span></div>
+      <p class="keys" data-en="In the note box: <kbd>Enter</kbd> save · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · <kbd>Option</kbd>+<kbd>Space</kbd> play/pause · <kbd>Esc</kbd>·<kbd>Tab</kbd> leave the box — everything else: <kbd>?</kbd>">메모 칸 안: <kbd>Enter</kbd> 남기기 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 줄바꿈 · <kbd>Option</kbd>+<kbd>Space</kbd> 재생·멈춤 · <kbd>Esc</kbd>·<kbd>Tab</kbd> 메모 칸에서 나가기 — 나머지는 <kbd>?</kbd></p>
+    </div>
+  </section>
+  <div class="sp" id="spr" data-s="r" data-a="‹" title="끌어서 칸 너비 조절 · 끝까지 밀면 접힘 · 두 번 누르면 처음 너비"></div>
+  <aside class="box" id="list" data-col="r">
+    <div class="row"><b>피드백</b><span id="cnt"></span><button class="popb" type="button" data-pop="l" title="이 칸을 따로 띄운 창으로 — 다른 모니터로 끌어 옮길 수 있습니다">⧉</button></div>
+    <div class="row"><button id="hob" type="button" class="main">✅ 피드백 완료 → AI<kbd>⇧Enter</kbd></button><button id="expb" type="button">📤 내보내기<kbd>⇧E</kbd></button><span id="cmsg" class="keys"></span></div>
+    <div class="row" id="delrow"></div>
+    <p class="keys" data-en="<kbd>↑</kbd><kbd>↓</kbd> pick a note (jumps there) · <kbd>E</kbd> edit · <kbd>C</kbd> ✓ mark done · <kbd>D</kbd> twice to delete · <kbd>V</kbd> pick for deleting → <kbd>⇧D</kbd> delete picked · <kbd>⇧X</kbd> delete all"><kbd>↑</kbd><kbd>↓</kbd> 메모 고르기(그 장면으로) · <kbd>E</kbd> 고치기 · <kbd>C</kbd> ✓ 완료 표시 · <kbd>D</kbd> 두 번 지우기 · <kbd>V</kbd> 지울 것 고르기 → <kbd>⇧D</kbd> 고른 것 지우기 · <kbd>⇧X</kbd> 전체 지우기</p>
+    <ol id="items"></ol>
+    <p id="file"></p>
+  </aside>
+</div>
+
+<div class="ov" id="pal" hidden><div class="pbox">
+  <div id="ppath" class="notr"></div>
+  <input id="pq" autocomplete="off" spellcheck="false" placeholder="이름 일부를 치세요 · ↑↓ 고르기 · Enter 열기 · ⌫(빈 칸) 위 폴더 · Esc 닫기">
+  <ol id="pl"></ol>
+</div></div>
+
+<div class="ov" id="exp" hidden><div class="ebox">
+  <h2 data-en="📤 Export <small class=&quot;keys&quot;>— press a number · <kbd>Esc</kbd> close</small>">📤 내보내기 <small class="keys">— 숫자를 누르세요 · <kbd>Esc</kbd> 닫기</small></h2>
+  <div id="e1" class="row" style="display:grid;gap:8px">
+    <button class="eo first" type="button" data-e="ai"><kbd>1</kbd><b>🤖 AI에게 넘기기</b><small>«어느 폴더의 어느 파일을 보라»는 글이 복사됩니다 → 쓰시는 AI 창에 붙여 넣기 (클로드·제미나이 등)</small></button>
+    <button class="eo" type="button" data-e="human"><kbd>2</kbd><b>👤 사람에게 넘기기</b><small>장면 사진 · 시간 · 메모를 보기 좋게 정리한 PDF → 영상 폴더에 저장 · 카톡·메일로 보내기</small></button>
+    <button class="eo" type="button" data-e="prog"><kbd>3</kbd><b>🎞 편집 프로그램으로</b><small>메모가 편집 프로그램 타임라인에 표시로 붙는 파일 → 다음에서 프로그램 고르기</small></button>
+  </div>
+  <div id="e2" style="display:grid;gap:8px" hidden>
+    <button class="eo" type="button" data-p="davinci"><kbd>1</kbd><b>다빈치 리졸브</b><small>.edl — 타임라인 메뉴 → 가져오기(Import) → Timeline Markers from EDL (타임라인 시작 01:00:00:00 기준)</small></button>
+    <button class="eo" type="button" data-p="fcp"><kbd>2</kbd><b>파이널 컷 프로</b><small>.fcpxml — 파일 → 가져오기 → XML → «수정 요청» 이벤트에 표시가 붙은 프로젝트가 생김</small></button>
+    <button class="eo" type="button" data-p="premiere"><kbd>3</kbd><b>프리미어 프로</b><small>.xml — 파일 → 가져오기 → 표시가 붙은 시퀀스가 생김 (영상 위치가 다르면 «미디어 연결»)</small></button>
+    <button class="eo" type="button" data-p="capcut"><kbd>4</kbd><b>캡컷</b><small>캡컷은 표시 파일을 불러오는 기능이 없어 캡컷 화면 시간(분:초:칸)으로 적은 시간표(.txt)</small></button>
+    <button class="eo back" type="button" data-b="1"><kbd>⌫</kbd> 뒤로</button>
+  </div>
+  <div id="eout" class="eout" hidden></div>
+</div></div>
+
+<div class="ov" id="ho" hidden><div class="ebox">
+  <h2>✅ 피드백 완료 <small class="keys" id="hokeys"></small></h2>
+  <div id="hocopy" class="hcopy"></div>
+  <div id="hmain" class="hstep" hidden>
+    <button class="eo first" type="button" data-h="auto"><kbd>1</kbd><b>⚡ 알아서 넘기기</b><small id="horoute"></small></button>
+    <button class="eo" type="button" data-h="one"><kbd>2</kbd><b>🖥 한 창에 전체 넘기기</b><small>모든 영상을 창 하나에 — 다음에서 창 고르기</small></button>
+    <button class="eo" type="button" data-h="per"><kbd>3</kbd><b>🎬 영상별로 고르기</b><small>영상마다 받을 곳을 직접 고르기</small></button>
+    <button class="eo" type="button" data-h="copy"><kbd>4</kbd><b>📋 복사만 하고 끝내기</b><small>다른 AI·사람에게 직접 붙여 넣기 — 넘긴 것으로 표시해 둡니다</small></button>
+  </div>
+  <div id="hone" class="hstep" hidden></div>
+  <div id="hper" class="hstep" hidden></div>
+  <div id="hout" class="eout" hidden></div>
+  <div class="hfoot"><button id="hosend" type="button" class="main" hidden>넘기기<kbd>Enter</kbd></button><button id="hoback" type="button" hidden>뒤로<kbd>⌫</kbd></button>
+    <span class="keys">새 창으로 켤 AI</span><select id="hocmd"></select><input id="hocus" placeholder="명령 (예: gemini -i)" hidden></div>
+  <p class="keys">클로드 창에는 «클로드 창끼리 말 넣는 길»로만 넣습니다 — 그냥 터미널(개인 작업 창)에는 아무것도 치지 않습니다.</p>
+</div></div>
+
+<div class="ov" id="mw" hidden><div class="ebox">
+  <h2 data-en="🌐 Whole-video note on <span id=&quot;mwn&quot;></span> picked videos <small class=&quot;keys&quot;>— <kbd>Enter</kbd> save · <kbd>Esc</kbd> close</small>">🌐 고른 <span id="mwn"></span>편에 영상 전체 메모 <small class="keys">— <kbd>Enter</kbd> 남기기 · <kbd>Esc</kbd> 닫기</small></h2>
+  <div id="mwl"></div>
+  <div class="row" id="mcats"></div>
+  <textarea id="mtxt" placeholder="고른 영상 모두에 똑같이 남길 메모 — 예: 색감을 조금 더 따뜻하게 · 배경음악 조금 줄이기"></textarea>
+  <div class="row"><button id="msave" type="button" class="main"></button><span id="mmsg"></span></div>
+  <p class="keys" data-en="Each video gets its own “🌐 Whole video” note — you can open that video later to edit or delete it. Categories <kbd>⌥1</kbd>–<kbd>⌥7</kbd> · <kbd>⇧Enter</kbd> new line · after saving you can write another one for the same videos.">영상마다 «🌐 영상 전체» 메모가 하나씩 따로 생깁니다 — 나중에 그 영상을 열어 고치거나 지울 수 있습니다. 갈래 <kbd>⌥1</kbd>~<kbd>⌥7</kbd> · <kbd>⇧Enter</kbd> 줄바꿈 · 남긴 뒤 같은 영상들에 하나 더 써도 됩니다.</p>
+</div></div>
+
+<div class="ov" id="help" hidden><div class="hbox">
+  <h2 data-en="⌨ Shortcuts <small class=&quot;keys&quot;>— they work with any keyboard language · <kbd>?</kbd> or <kbd>Esc</kbd> to close</small>">⌨ 단축키 <small class="keys">— 한글 입력 상태에서도 그대로 됩니다 · <kbd>?</kbd> 또는 <kbd>Esc</kbd> 로 닫기</small></h2>
+  <div class="hcols">
+    <div><h3>재생</h3><dl>
+      <dt><kbd>Space</kbd> <kbd>K</kbd></dt><dd>재생 · 멈춤</dd>
+      <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>2초 뒤 · 앞</dd>
+      <dt><kbd>J</kbd> <kbd>L</kbd></dt><dd>10초 뒤 · 앞</dd>
+      <dt><kbd>⇧←</kbd> <kbd>⇧→</kbd></dt><dd>0.1초 (멈춤)</dd>
+      <dt><kbd>,</kbd> <kbd>.</kbd></dt><dd>한 칸(1/30초) (멈춤)</dd>
+      <dt><kbd>0</kbd> · <kbd>End</kbd></dt><dd>처음 · 끝</dd>
+      <dt><kbd>S</kbd></dt><dd>속도 1× → 1.5× → 2×</dd>
+    </dl></div>
+    <div><h3>메모 남기기</h3><dl>
+      <dt><kbd>M</kbd> <kbd>Enter</kbd></dt><dd>지금 장면에 메모 (멈추고 메모 칸으로)</dd>
+      <dt><kbd>I</kbd> · <kbd>O</kbd></dt><dd>구간 시작 · 구간 끝</dd>
+      <dt><kbd>X</kbd></dt><dd>구간 지우기</dd>
+      <dt><kbd>G</kbd></dt><dd>🌐 영상 전체 메모 (색감·LUT · 화질 · 프레임 등 — 시간 없음)</dd>
+      <dt><kbd>⇧G</kbd></dt><dd data-en="☑ Pick several videos → press again to leave the same whole-video note on all of them (<kbd>Esc</kbd> to finish)">☑ 여러 영상 고르기 → 한 번 더 누르면 고른 영상 모두에 같은 «영상 전체» 메모 (<kbd>Esc</kbd> 끝내기)</dd>
+      <dt>메모 칸 <kbd>⌥1</kbd>~<kbd>⌥7</kbd></dt><dd>영상 전체 메모의 갈래 고르기</dd>
+      <dt>메모 칸 <kbd>Enter</kbd></dt><dd data-en="Save (<kbd>⇧Enter</kbd> new line)">남기기 (<kbd>⇧Enter</kbd> 줄바꿈)</dd>
+      <dt>메모 칸 <kbd>⌥Space</kbd></dt><dd>쓰면서 재생 · 멈춤</dd>
+      <dt>메모 칸 <kbd>Esc</kbd> <kbd>Tab</kbd></dt><dd>나가기 (빈 칸이면 시간 풀림 · 고치던 것은 취소)</dd>
+    </dl></div>
+    <div><h3>메모 목록 · 내보내기</h3><dl>
+      <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>이전 · 다음 메모 고르기 (그 장면으로)</dd>
+      <dt><kbd>E</kbd></dt><dd>고른 메모 고치기</dd>
+      <dt><kbd>C</kbd></dt><dd>고른 메모 ✓ 완료 표시 바꾸기</dd>
+      <dt><kbd>D</kbd> <kbd>D</kbd></dt><dd>고른 메모 지우기 (3초 안에 두 번)</dd>
+      <dt><kbd>V</kbd></dt><dd>지울 것으로 고르기 · 풀기 (여러 개)</dd>
+      <dt><kbd>⇧D</kbd> <kbd>⇧D</kbd></dt><dd>고른 것 지우기 (3초 안에 두 번)</dd>
+      <dt><kbd>⇧X</kbd> <kbd>⇧X</kbd></dt><dd>이 영상 메모 전체 지우기 (3초 안에 두 번)</dd>
+      <dt><kbd>⇧Enter</kbd></dt><dd>✅ 피드백 완료 — 요청 글이 바로 복사되고, 1 알아서 넘기기 · 2 한 창에 전체 · 3 영상별로 고르기 · 4 복사만</dd>
+      <dt><kbd>⇧E</kbd></dt><dd>내보내기 창 (1 AI · 2 사람 · 3 편집 프로그램)</dd>
+      <dt><kbd>⇧C</kbd></dt><dd>이 영상의 AI용 글만 바로 복사</dd>
+    </dl></div>
+    <div><h3>영상 · 폴더</h3><dl>
+      <dt><kbd>F</kbd></dt><dd data-en="Find a video or folder (part of the name → <kbd>Enter</kbd>)">영상·폴더 찾기 창 (이름 일부 → <kbd>Enter</kbd>)</dd>
+      <dt><kbd>⌫</kbd></dt><dd>위 폴더 (찾기 창에서는 빈 칸일 때)</dd>
+      <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>이 폴더의 이전 · 다음 영상</dd>
+      <dt><kbd>⇧F</kbd></dt><dd>폴더 창(Finder·탐색기)으로 고르기</dd>
+      <dt><kbd>R</kbd></dt><dd>고친 판 다시 불러오기</dd>
+      <dt><kbd>?</kbd></dt><dd>이 창 열기 · 닫기</dd>
+    </dl></div>
+    <div><h3>화면 배치 (듀얼 모니터)</h3><dl>
+      <dt><kbd>W</kbd></dt><dd>⧉ 영상 따로 띄우기 · 되돌리기 — 띄운 창을 다른 모니터로 끌어 키우기 (창 위 «⛶ 전체 화면»)</dd>
+      <dt>⧉</dt><dd>폴더·영상 · 메모 쓰기 · 피드백 목록 칸도 따로 띄우기 — 창을 닫으면 제자리로</dd>
+      <dt>칸 사이 줄</dt><dd>끌어서 너비 조절 · 끝까지 밀면 접힘 · 누르면 다시 폄 · 두 번 누르면 처음 너비</dd>
+      <dt><kbd>⇧W</kbd></dt><dd>띄운 칸 모두 제자리로 · 칸 너비 처음대로</dd>
+      <dt>단축키</dt><dd data-en="They work the same in every window (press <kbd>M</kbd> in a popped-out window and the note box comes to that window for a moment)">어느 창에서 눌러도 똑같이 됩니다 (띄운 창에서 <kbd>M</kbd> 을 누르면 메모 칸이 잠깐 그 창으로 옵니다)</dd>
+    </dl></div>
+  </div>
+</div></div>
+
+<div class="ov" id="about" hidden><div class="hbox abox" lang="en">
+  <h2>Video Feedback <small class="keys">v{{버전}}</small></h2>
+  <p>Pause a video, leave notes pinned to the exact moment, then hand them to an AI, a person, or an editing app. Runs only on this computer (Mac or Windows). Videos never leave it.</p>
+  <h3>Credits</h3>
+  <p>The first version was built from the prompt in a video by <b>@ahot_jay</b> on Instagram.<br>Improvements and upgrades since then by <b>{{만든이}}</b>.</p>
+  <h3>Make it yours</h3>
+  <p>This is a starting point. Ask your AI (Claude Code, Gemini CLI …) to upgrade it to fit the way you work. Give it this folder:</p>
+  <pre>{{폴더}}</pre>
+  <h3>Language · 언어</h3>
+  <p class="row notr" id="langs"><button type="button" data-lang="ko">한국어</button><button type="button" data-lang="en">English</button></p>
+  <h3>Version history</h3>
+  <ul>{{바뀐것}}</ul>
+</div></div>
+
+<script>
+const Q=new URLSearchParams(location.search),T=Q.get('t')||'';
+const LANG='{{언어}}'==='en'?'en':'ko',KE=(ko,en)=>LANG==='en'?en:ko,LOC=KE('ko-KR','en-US');   // 화면 말(v1.5) — 서버가 채운다 · 짧은 글은 맨 아래 낱말표(EN), 단추·표가 섞인 글은 KE(한국어, 영어)
+const POP={};   // 따로 띄운 창(v1.4.7) — 칸이 그 창으로 옮겨 가도 $ 로 찾게
+const live=w=>!!w&&!w.closed;
+const popFind=id=>{for(const k in POP)if(live(POP[k])){const e=POP[k].document.getElementById(id);if(e)return e}return null};
+const $=id=>document.getElementById(id)||popFind(id),vid=$('vid'),txt=$('txt'),pq=$('pq');
+let DIR=Q.get('d')||'',CUR=Q.get('v')||'',LS=null,FB={메모:[]},JS='',AITXT='',HO=null,HS='',HONE=0,HV=0,PICK=new Set(),DELS='',VM=0,A=null,B=null,LOCK=null,EDIT=0,GL=false,CAT='',SIG='',SEL=0,DELN=0,PI=0,ENC=0,BUSY=false;
+const SPEEDS=[1,1.5,2],FPS=1/30,CATS=KE(['색감·LUT','필터·효과','화질·해상도','프레임(fps)','음량·음악','자막 모양','기타'],['Color/LUT','Filters/effects','Quality/resolution','Frame rate (fps)','Volume/music','Caption style','Other']);
+const nf=s=>String(s??'').normalize('NFC');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const tf=s=>{if(s==null||isNaN(s))return '0:00.0';const m=Math.floor(s/60),r=s-m*60;return m+':'+(r<10?'0':'')+r.toFixed(1)};
+const tf0=s=>tf(s).replace(/\.\d$/,'');
+const mb=n=>n>1e9?(n/1e9).toFixed(1)+'GB':(n/1e6).toFixed(0)+'MB';
+async function api(p,body){const r=await fetch(p+(p.includes('?')?'&':'?')+'t='+encodeURIComponent(T),body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
+  const j=await r.json().catch(()=>({오류:'답이 없습니다'}));if(!r.ok)throw new Error(j.오류||r.status);return j}
+const say=(t,el='msg')=>{$(el).textContent=t;if(t)setTimeout(()=>{if($(el).textContent===t)$(el).textContent=''},5000)};
+function keepUrl(){const q=new URLSearchParams({t:T,d:DIR});if(CUR)q.set('v',CUR);history.replaceState(null,'','?'+q)}
+const M=()=>FB.메모||[],byNo=n=>M().find(x=>x.번호===n);
+
+// ── 왼쪽: 폴더·영상
+
+let SORT='최근';const NEWC={},KO=new Intl.Collator('ko',{numeric:true});
+const when=t=>new Date(t*1000).toLocaleString(LOC,{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+function sortLS(){const nm=(a,b)=>KO.compare(a.이름,b.이름),v=LS.영상들,f=LS.폴더들;
+  if(SORT==='이름'){v.sort(nm);f.sort(nm);return}
+  const s=SORT==='최근'?-1:1;v.sort((a,b)=>s*(a.고친때-b.고친때)||nm(a,b));
+  f.sort((a,b)=>{const x=a.최근||0,y=b.최근||0;return x&&y?s*(x-y)||nm(a,b):x?-1:y?1:nm(a,b)})}   // 영상 없는 폴더는 늘 아래에 이름순
+const fTag=d=>d.최근===undefined?'최근 영상 확인 중…':d.최근===null?'확인 못 함(오래 걸림)':d.최근?'최근 영상 '+when(d.최근):'영상 없음';
+function drawFl(){if(!LS)return;sortLS();
+  $('fl').innerHTML=(LS.영상들.length?'':'<p class="keys">이 폴더에는 영상이 없습니다</p>')+
+    LS.영상들.map(v=>{const p=pj(DIR,v.이름);return `<button class="f${p===CUR?' cur':''}${MULTI&&MSEL.has(p)?' on':''}" data-v="${esc(p)}">${MULTI?'<span class="cb">✓</span>':''}🎬 ${esc(v.이름)}<small>${when(v.고친때)} · ${mb(v.크기)}${v.메모?` · <b class="n">메모 ${v.메모}</b> · 수정 완료 ${v.반영}`:''}</small></button>`}).join('')+
+    LS.폴더들.map(d=>`<button class="f" data-d="${esc(pj(DIR,d.이름))}">📁 ${esc(d.이름)}<small>${fTag(d)}</small></button>`).join('');
+  popTitle();
+  drawMbar();if(!$('pal').hidden)palDraw()}
+async function newest(d){let c;try{c=(await api('/api/newest?p='+encodeURIComponent(d))).최근;NEWC[d]=c}catch(e){c=null}
+  if(DIR!==d||!LS||!LS.폴더들.length)return;LS.폴더들.forEach(x=>x.최근=c?c[x.이름]??null:x.최근??null);drawFl()}
+async function ls(p){const wait=setTimeout(()=>$('fl').innerHTML='<p class="keys">폴더를 여는 중…</p>',200);
+  try{const j=await api('/api/ls?p='+encodeURIComponent(p));clearTimeout(wait);LS=j;DIR=j.폴더;SORT=j.정렬||SORT;$('sort').value=SORT;keepUrl();$('where').textContent=DIR;$('up').disabled=!j.위;
+    if(!LAYOK){LAYOK=1;if(j.배치&&typeof j.배치==='object')LAY=j.배치;lay()}   // 칸 너비 · 접힘 · 띄운 창 자리는 처음 한 번만 받는다
+    const c=NEWC[DIR];if(c)j.폴더들.forEach(x=>x.최근=c[x.이름]);   // 전에 본 폴더는 지난번 때로 먼저 줄 세움
+    drawFl();if(j.폴더들.length)newest(DIR);return j}
+  catch(e){clearTimeout(wait);$('fl').innerHTML=`<p class="err">${esc(e.message)}</p>`;if(!$('pal').hidden)$('pl').innerHTML=`<li class="pnone err">${esc(e.message)}</li>`}}
+$('sort').onchange=e=>{SORT=e.target.value;e.target.blur();drawFl();api('/api/set',{정렬:SORT}).catch(()=>{})};
+$('fl').onclick=e=>{const b=e.target.closest('.f');if(!b)return;if(b.dataset.d)ls(b.dataset.d);else if(MULTI)mPick(b.dataset.v,e.shiftKey);else openV(b.dataset.v)};
+const upDir=()=>LS&&LS.위&&ls(LS.위);
+$('up').onclick=upDir;
+async function pickF(){say('열린 폴더 창에서 폴더를 고르세요');try{const j=await api('/api/pick',{});if(j.폴더)ls(j.폴더)}catch(e){say(e.message)}}
+$('pick').onclick=pickF;
+const vids=()=>LS?LS.영상들.map(v=>pj(DIR,v.이름)):[];
+function stepVideo(d){const L=vids();if(!L.length)return say('이 폴더에는 영상이 없습니다');let i=L.indexOf(CUR);i=i<0?0:i+d;
+  if(i<0||i>=L.length)return say(d>0?'이 폴더의 마지막 영상입니다':'이 폴더의 첫 영상입니다');openV(L[i])}
+
+
+//    고른 것은 폴더를 옮겨도 남는다 · 남기면 영상마다 메모가 하나씩 따로 생긴다(서버 /api/opmany)
+let MULTI=false,MCAT='',MLAST='';const MSEL=new Set();
+function drawMbar(){$('mbar').hidden=!MULTI;$('multi').setAttribute('aria-pressed',MULTI);if(!MULTI)return;
+  const here=vids(),k=here.filter(p=>MSEL.has(p)).length,n=MSEL.size;
+  $('mcnt').textContent=`고른 영상 ${n}편`+(n>k?` (다른 폴더 ${n-k}편 포함)`:'');
+  $('mall').textContent=here.length&&k===here.length?'이 폴더 고르기 풀기':`이 폴더 영상 모두 (${here.length})`;$('mall').disabled=!here.length;
+  $('mwrite').disabled=!n;$('mwrite').innerHTML=n?`🌐 고른 ${n}편에 전체 메모<kbd>⇧G</kbd>`:'왼쪽에서 영상을 고르세요'}
+function multiOn(on){MULTI=on;if(!on){MSEL.clear();MLAST=''}drawFl()}
+function mPick(p,range){const L=vids(),i=L.indexOf(MLAST),j=L.indexOf(p);
+  if(range&&i>=0&&j>=0)L.slice(Math.min(i,j),Math.max(i,j)+1).forEach(x=>MSEL.add(x));else MSEL.has(p)?MSEL.delete(p):MSEL.add(p);
+  MLAST=p;drawFl()}
+function mAll(){const L=vids(),all=L.length&&L.every(p=>MSEL.has(p));L.forEach(p=>all?MSEL.delete(p):MSEL.add(p));drawFl()}
+$('multi').onclick=()=>multiOn(!MULTI);
+$('mbar').onclick=e=>{const m=e.target.closest('[data-m]')?.dataset.m;if(m==='all')mAll();else if(m==='none'){MSEL.clear();MLAST='';drawFl()}else if(m==='write')mwOpen();else if(m==='end')multiOn(false)};
+const multiKey=()=>!MULTI?multiOn(true):MSEL.size?mwOpen():multiOn(false);
+function drawMw(){const L=[...MSEL],more=L.length-12;$('mwn').textContent=L.length;
+  $('mwl').innerHTML=L.slice(0,12).map(p=>'🎬 '+esc(base(p))).join('<br>')+(more>0?`<br>… 외 ${more}편`:'');
+  $('mcats').innerHTML=catsHtml(MCAT);$('msave').innerHTML=`고른 ${L.length}편에 남기기<kbd>Enter</kbd>`}
+function mwOpen(){if(!MSEL.size)return say('먼저 왼쪽에서 영상을 고르세요');$('mw').hidden=false;$('mmsg').textContent='';drawMw();$('mtxt').focus();awayNote(KE('🌐 여러 영상 메모 창','🌐 The multi-video note'))}
+const mwClose=()=>{$('mw').hidden=true;$('mtxt').blur()};
+async function saveMany(){const g=$('mtxt').value.trim(),o=$('mmsg');if(!MSEL.size||BUSY)return;if(!g){o.className='bad';o.textContent='메모를 적어 주세요';return}
+  BUSY=true;o.className='';o.textContent='남기는 중…';
+  try{const j=await api('/api/opmany',{vs:[...MSEL],분류:MCAT,글:g}),ok=new Set(j.결과.filter(r=>r.ok).map(r=>r.v)),bad=j.결과.filter(r=>!r.ok);
+    $('mtxt').value='';MCAT='';drawMw();
+    if(LS)LS.영상들.forEach(v=>{if(ok.has(pj(DIR,v.이름)))v.메모=(v.메모||0)+1});drawFl();   // 왼쪽 «메모 n» 은 서버에 다시 안 묻고 여기서 더한다
+    o.className=bad.length?'bad':'';o.innerHTML=`✅ ${ok.size}편에 남겼습니다 — 같은 영상들에 하나 더 써도 됩니다`+bad.map(r=>`<br>⚠ ${esc(base(r.v))}: ${esc(r.오류)}`).join('');
+    if(CUR&&ok.has(CUR))take(await api('/api/fb?v='+encodeURIComponent(CUR)))}
+  catch(e){o.className='bad';o.textContent='못 남겼습니다: '+e.message}finally{BUSY=false}}
+$('msave').onclick=saveMany;
+$('mcats').onclick=e=>{const b=e.target.closest('.cat');if(!b)return;MCAT=MCAT===b.dataset.c?'':b.dataset.c;drawMw();$('mtxt').focus()};
+$('mtxt').addEventListener('keydown',e=>{if(onEnter(e,saveMany))return;
+  if(e.key==='Escape'){e.preventDefault();mwClose()}
+  else if(e.altKey&&/^Digit[1-7]$/.test(e.code)){e.preventDefault();const c=CATS[+e.code.slice(5)-1];MCAT=MCAT===c?'':c;drawMw()}});
+$('mw').addEventListener('mousedown',e=>{if(e.target.id==='mw')mwClose()});
+
+// ── 영상·폴더 찾기 창 (F)
+function palOpen(){$('pal').hidden=false;pq.value='';PI=0;palDraw();pq.focus();awayNote(KE('🔎 찾기 창','🔎 The finder'))}
+function palClose(){$('pal').hidden=true;pq.blur()}
+function palItems(){if(!LS)return [];const q=nf(pq.value).toLowerCase().trim();
+  const all=[...LS.영상들.map(v=>({k:'v',n:v.이름,p:pj(DIR,v.이름),s:v})),...LS.폴더들.map(d=>({k:'d',n:d.이름,p:pj(DIR,d.이름)}))];
+  return q?all.filter(x=>nf(x.n).toLowerCase().includes(q)):all}
+function palDraw(){const L=palItems();PI=Math.max(0,Math.min(PI,L.length-1));$('ppath').textContent='📁 '+DIR;
+  $('pl').innerHTML=(LS&&LS.위?`<li class="pup">⌫ 위 폴더 — ${esc(base(LS.위)||LS.위)}</li>`:'')+(L.length?L.map((x,i)=>`<li class="${i===PI?'on':''}" data-i="${i}">${x.k==='d'?'📁':'🎬'} ${esc(x.n)}${x.k==='v'&&x.s.메모?` <small>· 메모 ${x.s.메모} · 완료 ${x.s.반영}</small>`:''}</li>`).join(''):'<li class="pnone">맞는 것이 없습니다</li>');
+  $('pl').querySelector('li.on')?.scrollIntoView({block:'nearest'})}
+async function palPick(x){if(!x)return;if(x.k==='d'){pq.value='';PI=0;await ls(x.p);pq.focus()}else{palClose();openV(x.p)}}
+pq.addEventListener('input',()=>{PI=0;palDraw()});
+pq.addEventListener('keydown',e=>{if(e.isComposing||e.keyCode===229)return;const L=palItems();
+  if(e.key==='ArrowDown'){e.preventDefault();PI=Math.min(L.length-1,PI+1);palDraw()}
+  else if(e.key==='ArrowUp'){e.preventDefault();PI=Math.max(0,PI-1);palDraw()}
+  else if(e.key==='Enter'){e.preventDefault();palPick(L[PI])}
+  else if(e.key==='Escape'){e.preventDefault();palClose()}
+  else if(e.key==='Backspace'&&!pq.value){e.preventDefault();upDir()}});
+$('pl').onclick=e=>{const li=e.target.closest('li');if(!li)return;if(li.classList.contains('pup'))return upDir();if(li.dataset.i!=null)palPick(palItems()[+li.dataset.i])};
+$('pal').addEventListener('mousedown',e=>{if(e.target.id==='pal')palClose()});
+$('find').onclick=palOpen;
+
+// ── 단축키 · 버전 창 (?)
+const helpToggle=()=>{$('help').hidden=!$('help').hidden;if(!$('help').hidden)awayNote(KE('⌨ 단축키 창','⌨ The shortcut list'))};
+$('hk').onclick=helpToggle;$('help').addEventListener('mousedown',e=>{if(e.target.id==='help')helpToggle()});
+const aboutToggle=()=>{$('about').hidden=!$('about').hidden;$('langs').querySelectorAll('[data-lang]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lang===LANG))};
+$('langs').onclick=e=>{const l=e.target.closest('[data-lang]')?.dataset.lang;if(l&&l!==LANG)api('/api/set',{언어:l}).then(()=>location.reload()).catch(x=>say(x.message,'hmsg'))};   // 말 바꾸기 — 서버 글(요청 글 · 내보내기)도 같이 바뀐다
+$('ver').onclick=aboutToggle;$('about').addEventListener('mousedown',e=>{if(e.target.id==='about')aboutToggle()});
+
+// ── 가운데: 영상
+async function openV(p){CUR=p;keepUrl();A=B=null;LOCK=null;EDIT=0;GL=false;SEL=0;PICK.clear();DELS='';txt.value='';$('newv').hidden=true;showGL();
+  $('fl').querySelectorAll('.f').forEach(b=>b.classList.toggle('cur',b.dataset.v===p));popTitle();
+  vid.src='/v?v='+encodeURIComponent(p)+'&t='+encodeURIComponent(T);vid.hidden=false;$('empty').hidden=true;   // 영상을 먼저 바꿔야 바로 누른 Space 가 새 영상에 간다
+  try{const j=await api('/api/fb?v='+encodeURIComponent(p));SIG='';take(j);VM=j.vm;showRng()}
+  catch(e){say(e.message)}}
+function take(j){if(j.ai)AITXT=j.ai;const s=JSON.stringify(j.data);if(s===SIG)return;SIG=s;FB=j.data;JS=j.json;if(SEL&&!byNo(SEL))SEL=0;PICK.forEach(n=>{if(!byNo(n))PICK.delete(n)});$('file').textContent='저장 파일: '+JS;drawList();drawBar()}
+vid.addEventListener('timeupdate',()=>{tick();nearMark()});vid.addEventListener('seeked',tick);vid.addEventListener('loadedmetadata',()=>{tick();drawBar()});
+vid.addEventListener('play',()=>{$('pp').innerHTML='❚❚ 멈춤<kbd>Space</kbd>'});vid.addEventListener('pause',()=>{$('pp').innerHTML='▶ 재생<kbd>Space</kbd>'});
+vid.addEventListener('focus',()=>vid.blur());   // 영상 자체 단축키와 겹치지 않게
+function tick(){const t=vid.currentTime;$('tm').textContent=tf(t)+' / '+tf(vid.duration);$('mkt').textContent=tf0(t);
+  if(!LOCK&&!EDIT&&!GL)$('at').innerHTML=A!=null?`이 구간에 메모 · <span class="t">${tf(A)} ~ ${tf(B??t)}</span>`:`이 장면에 메모 · <span class="t">${tf(t)}</span>`;
+  const h=$('bar').querySelector('.hd');if(h&&vid.duration)h.style.left=(t/vid.duration*100)+'%';
+  if(A!=null&&B==null)drawBar()}
+const seek=t=>{vid.currentTime=Math.max(0,Math.min(vid.duration||0,t))};
+const seekBy=d=>seek(vid.currentTime+d);
+const nudge=d=>{vid.pause();seekBy(d)};
+const togglePlay=()=>vid.paused?vid.play():vid.pause();
+function cycleSpeed(){const i=(SPEEDS.indexOf(vid.playbackRate)+1)%SPEEDS.length;vid.playbackRate=SPEEDS[i];$('spd').innerHTML=`속도 ${SPEEDS[i]}×<kbd>S</kbd>`}
+$('pp').onclick=togglePlay;$('b2').onclick=()=>seekBy(-2);$('f2').onclick=()=>seekBy(2);
+$('b01').onclick=()=>nudge(-.1);$('f01').onclick=()=>nudge(.1);$('spd').onclick=cycleSpeed;
+$('bar').onclick=e=>{if(!vid.duration)return;const r=$('bar').getBoundingClientRect();seek((e.clientX-r.left)/r.width*vid.duration)};
+function drawBar(){const d=vid.duration;if(!d){$('bar').innerHTML='';return}
+  const pc=s=>(s/d*100)+'%';let h='';
+  if(A!=null){const b=B??vid.currentTime;h+=`<div class="rg" style="left:${pc(Math.min(A,b))};width:${pc(Math.abs(b-A))}"></div>`}
+  M().filter(m=>!m.전체).forEach(m=>{const c=m.반영?' ok':'';h+=m.끝!=null?`<div class="seg${c}" style="left:${pc(m.시작)};width:${pc(m.끝-m.시작)}"></div>`:'';h+=`<div class="tk notr${c}${m.번호===SEL?' sl':''}" style="left:${pc(m.시작)}" title="${esc(m.번호+'. '+m.글)}"></div>`});
+  $('bar').innerHTML=h+`<div class="hd" style="left:${pc(vid.currentTime)}"></div>`}
+function showRng(){$('rng').textContent=A!=null?`구간 ${tf(A)} ~ ${B!=null?tf(B):'(끝: O)'}`:'';drawBar();tick()}
+const rangeA=()=>{A=vid.currentTime;if(B!=null&&B<=A)B=null;LOCK=null;showRng()};
+const rangeB=()=>{if(A==null)A=0;B=vid.currentTime;if(B<A)[A,B]=[B,A];LOCK=null;vid.pause();showRng()};
+const rangeClear=()=>{A=B=null;LOCK=null;showRng()};
+$('ia').onclick=rangeA;$('ib').onclick=rangeB;$('ic').onclick=rangeClear;
+
+// ── 메모: 쓰기 시작하면 멈추고 그 시간을 붙잡는다 · 영상 전체 메모(G)는 시간 없이
+function lock(){if(LOCK||EDIT||GL)return;vid.pause();LOCK=A!=null?{s:A,e:B??vid.currentTime}:{s:vid.currentTime,e:null};
+  $('at').innerHTML=(LOCK.e!=null?'이 구간에 메모 · ':'이 장면에 메모 · ')+`<span class="t">${tf(LOCK.s)}${LOCK.e!=null?' ~ '+tf(LOCK.e):''}</span> 📌`}
+const catsHtml=sel=>CATS.map((c,i)=>`<button class="cat" type="button" data-c="${esc(c)}" aria-pressed="${sel===c}">${esc(c)}<kbd>⌥${i+1}</kbd></button>`).join('');   // 한 영상(G)·여러 영상(⇧G) 같이 씀
+function showGL(){$('memo').classList.toggle('gl',GL);$('cats').hidden=!GL;
+  $('cats').innerHTML=catsHtml(CAT);
+  if(GL)$('at').innerHTML='🌐 <span class="w">영상 전체에 메모</span> — 색감·LUT · 화질 · 프레임처럼 영상 전체에 대한 것 (갈래는 골라도 되고 안 골라도 됩니다)';else tick()}
+function globalMemo(){if(!CUR)return;GL=true;LOCK=null;EDIT=0;CAT='';showGL();memoTo();txt.focus()}
+$('gb').onclick=globalMemo;
+$('cats').onclick=e=>{const b=e.target.closest('.cat');if(!b)return;CAT=CAT===b.dataset.c?'':b.dataset.c;showGL();txt.focus()};
+function markHere(){if(!CUR)return;if(!EDIT){GL=false;showGL();LOCK=null;lock()}memoTo();txt.focus()}
+function cancelMemo(){txt.value='';LOCK=null;EDIT=0;GL=false;CAT='';$('save').innerHTML='남기기<kbd>Enter</kbd>';showGL()}
+txt.addEventListener('input',()=>{if(txt.value.trim())lock();else if(!EDIT&&!GL){LOCK=null;tick()}});
+$('mk').onclick=markHere;
+async function saveMemo(){const g=txt.value.trim();if(!CUR)return say('먼저 영상을 고르세요');if(!g)return say('메모를 적어 주세요');
+  try{let j;if(EDIT)j=await api('/api/op',{v:CUR,op:'edit',번호:EDIT,글:g});
+    else if(GL)j=await api('/api/op',{v:CUR,op:'add',전체:true,분류:CAT,글:g,길이:vid.duration||0});
+    else{lock();j=await api('/api/op',{v:CUR,op:'add',시작:LOCK.s,끝:LOCK.e,글:g,길이:vid.duration||0})}
+    const was=EDIT,wg=GL;take({data:j.data,json:JS,ai:j.ai});cancelMemo();A=B=null;showRng();txt.blur();say(was?`${was}번을 고쳤습니다`:wg?'영상 전체 메모를 남겼습니다':'남겼습니다 — Space 로 이어 보기')}
+  catch(e){say('못 남겼습니다: '+e.message)}}
+$('save').onclick=saveMemo;$('cancel').onclick=cancelMemo;
+function onEnter(e,fn){   // 메모 칸 Enter = 남기기 · 한글 조합 중 Enter: 크롬은 확정용 Enter 뒤에 한 번 더 보내고, 사파리는 안 보낸다 → 잠깐 기다렸다 한 번만
+  if(e.isComposing||e.keyCode===229){if(e.key==='Enter'&&!e.shiftKey)ENC=setTimeout(()=>{ENC=0;fn()},80);return true}
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(ENC){clearTimeout(ENC);ENC=0}fn();return true}
+  return false}
+txt.addEventListener('keydown',e=>{if(onEnter(e,saveMemo))return;
+  if(e.key==='Escape'||e.key==='Tab'){e.preventDefault();if(EDIT||GL&&!txt.value.trim()||!txt.value.trim())cancelMemo();txt.blur()}
+  else if(e.code==='Space'&&e.altKey){e.preventDefault();togglePlay()}
+  else if(GL&&e.altKey&&/^Digit[1-7]$/.test(e.code)){e.preventDefault();const c=CATS[+e.code.slice(5)-1];CAT=CAT===c?'':c;showGL()}});
+
+// ── 오른쪽: 메모 목록
+function drawList(){const L=M(),dn=L.filter(m=>m.반영).length;
+  $('cnt').textContent=`메모 ${L.length} · 수정 완료(${dn})`+(L.length-dn?` · 남음 ${L.length-dn}`:'');
+  drawDel();$('items').innerHTML=L.length?L.map(m=>`<li class="it${m.전체?' whole':''}${m.반영?' done':''}${m.번호===SEL?' sel':''}${PICK.has(m.번호)?' pkd':''}" data-n="${m.번호}"><div class="top"><button data-a="pk" type="button" class="pk${PICK.has(m.번호)?' on':''}" title="지울 것으로 고르기 (V)" aria-pressed="${PICK.has(m.번호)}">✓</button><span class="ts">${m.전체?'🌐 영상 전체':'▶ '+esc(m.시간)}</span>${m.분류?`<span class="tag">${esc(m.분류)}</span>`:''}<span class="no">${m.번호}번</span>
+    <span class="act"><button data-a="tog" type="button" title="C">${m.반영?'✓ 완료됨':'완료 표시'}</button><button data-a="ed" type="button" title="E">고치기</button><button data-a="del" type="button" title="D 두 번">${DELN===m.번호?'정말 지우기':'지우기'}</button></span></div>
+    <div class="tx notr">${esc(m.글)}</div>${!m.반영&&m.넘긴때?`<div class="sent">→ 넘김 ${esc(m.넘긴때)} · ${esc(m.넘긴곳)}</div>`:''}${DELN===m.번호?'<div class="warn">D 를 한 번 더 누르면 지웁니다 (3초)</div>':''}${m.반영?`<div class="dn">✓ 반영 ${esc(m.반영때)} — ${esc(m.반영내용)}</div>`:m.반영내용?`<div class="dn" style="color:var(--sub)">지난 반영: ${esc(m.반영내용)} → 다시 고쳐야 함</div>`:''}</li>`).join(''):KE('<p class="keys">아직 메모가 없습니다. 보다가 <kbd>M</kbd> 을 누르거나 메모 칸에 쓰면 여기 모입니다. 영상 전체에 대한 것은 <kbd>G</kbd>.</p>','<p class="keys">No notes yet. Press <kbd>M</kbd> while watching, or just type in the note box — notes collect here. For the whole video: <kbd>G</kbd>.</p>')}
+function select(n,go=true){SEL=n;DELN=0;const m=byNo(n);if(m&&go&&!m.전체){vid.pause();seek(m.시작)}drawList();drawBar();
+  $('items').querySelector('li.sel')?.scrollIntoView({block:'nearest'})}
+function selMove(d){const L=M();if(!L.length)return say('메모가 아직 없습니다');let i=L.findIndex(m=>m.번호===SEL);
+  if(i<0){const t=vid.currentTime,P=L.map(m=>!m.전체&&m.시작<t-.05);i=d>0?L.findIndex(m=>!m.전체&&m.시작>t+.05):P.lastIndexOf(true);if(i<0)i=d>0?L.length-1:0}
+  else i=Math.max(0,Math.min(L.length-1,i+d));select(L[i].번호)}
+function startEdit(n){const m=byNo(n);if(!m)return;EDIT=n;LOCK=null;GL=false;showGL();txt.value=m.글;$('save').innerHTML=`${n}번 고쳐 남기기<kbd>Enter</kbd>`;
+  $('at').innerHTML=`${n}번 메모 고치기 · <span class="t">${esc(m.시간)}</span> (<kbd>Esc</kbd> 취소)`;memoTo();txt.focus();txt.setSelectionRange(txt.value.length,txt.value.length)}
+async function op(body){try{const j=await api('/api/op',Object.assign({v:CUR},body));take({data:j.data,json:JS,ai:j.ai})}catch(e){say(e.message,'cmsg')}}
+async function delAsk(n){if(DELN!==n){DELN=n;drawList();setTimeout(()=>{if(DELN===n){DELN=0;drawList()}},3000);return}
+  DELN=0;const L=M(),i=L.findIndex(m=>m.번호===n);await op({op:'del',번호:n});const R=M();SEL=R.length?R[Math.min(i,R.length-1)].번호:0;drawList();drawBar();say(`${n}번을 지웠습니다`,'cmsg')}
+const toggleDone=n=>{const m=byNo(n);if(m)op({op:'toggle',번호:n,반영:!m.반영})};
+$('items').onclick=e=>{const li=e.target.closest('li.it');if(!li)return;const n=+li.dataset.n,a=e.target.closest('[data-a]')?.dataset.a;
+  if(a==='ed')return startEdit(n);if(a==='del')return delAsk(n);if(a==='tog')return toggleDone(n);if(a==='pk')return togglePick(n);select(n)};
+// 여러 개 지우기 — V(또는 ✓ 칸)로 고르고 «고른 것 지우기» · «전체 지우기» 는 3초 안에 두 번 눌러야 지운다(되돌리기 없음)
+function drawDel(){const n=M().length,k=PICK.size;$('delrow').innerHTML=!n?'':
+  (k?`<button type="button" data-d="sel" class="${DELS==='sel'?'warn':''}">${DELS==='sel'?`정말 ${k}개 지울까요? 한 번 더`:`🗑 고른 것 지우기 (${k})`}<kbd>⇧D</kbd></button><button type="button" data-d="none">고르기 풀기</button>`:'')+
+  `<button type="button" data-d="all" class="${DELS==='all'?'warn':''}">${DELS==='all'?`정말 ${n}개 모두 지울까요? 한 번 더`:'🗑 전체 지우기'}<kbd>⇧X</kbd></button>`}
+function togglePick(n){if(!n||!byNo(n))return say('먼저 ↑↓ 로 메모를 고르세요','cmsg');PICK.has(n)?PICK.delete(n):PICK.add(n);DELS='';drawList()}
+async function delMany(kind){if(kind==='sel'&&!PICK.size)return say('먼저 V(또는 ✓ 칸)로 지울 메모를 고르세요','cmsg');if(!M().length)return;
+  if(DELS!==kind){DELS=kind;drawList();setTimeout(()=>{if(DELS===kind){DELS='';drawList()}},3000);return}
+  DELS='';const k=kind==='all'?M().length:PICK.size;await op(kind==='all'?{op:'clear'}:{op:'delmany',번호들:[...PICK]});PICK.clear();SEL=0;drawList();drawBar();
+  say(kind==='all'?`메모 ${k}개를 모두 지웠습니다`:`고른 메모 ${k}개를 지웠습니다`,'cmsg')}
+$('delrow').onclick=e=>{const d=e.target.closest('[data-d]')?.dataset.d;if(d==='none'){PICK.clear();DELS='';drawList()}else if(d)delMany(d)};
+function nearMark(){const t=vid.currentTime;$('items').querySelectorAll('li.it').forEach(li=>{const m=byNo(+li.dataset.n);
+  li.classList.toggle('near',!!m&&!m.전체&&(m.끝!=null?t>=m.시작-.3&&t<=m.끝+.3:Math.abs(t-m.시작)<.8))})}
+
+// ── 내보내기 (⇧E): 1 AI → 2 사람 → 3 편집 프로그램(다빈치·파이널 컷·프리미어·캡컷)
+const base=p=>String(p).replace(/[\\/]+$/,'').split(/[\\/]/).pop(),pj=(d,n)=>d.replace(/[\\/]+$/,'')+(/^([A-Za-z]:\\|\\\\)/.test(d)?'\\':'/')+n;   // AI용 글은 서버가 만든다(AITXT) — 같은 지시문을 두 곳에 쓰지 않는다
+function eShow(step){$('e1').hidden=step!==1;$('e2').hidden=step!==2}
+function eOut(html,bad){const o=$('eout');o.hidden=!html;o.classList.toggle('bad',!!bad);o.innerHTML=html||''}
+function expOpen(){if(!CUR)return say('먼저 영상을 고르세요','cmsg');if(!M().length)return say('메모가 없습니다','cmsg');$('exp').hidden=false;eShow(1);eOut('');awayNote(KE('📤 내보내기 창','📤 The export menu'))}
+const expClose=()=>{$('exp').hidden=true};
+async function copyAI(){if(!CUR)return say('먼저 영상을 고르세요','cmsg');if(!M().length)return say('메모가 없습니다','cmsg');const t=AITXT;let ok=true;
+  try{await navigator.clipboard.writeText(t)}catch(e){ok=false}
+  const how=KE(`<b>${ok?'📋 복사했습니다.':'⚠ 복사가 막혔습니다 — 아래 글을 직접 복사하세요.'}</b> 쓰시는 AI 창(클로드 코드 · 제미나이 CLI 등)에 <b>붙여 넣기(${PASTE})</b> 하세요.<small class="keys">채팅만 되는 AI(제미나이 앱 등)는 폴더를 못 열어서 직접 고치지는 못하고 조언만 합니다.</small>`,
+    `<b>${ok?'📋 Copied.':'⚠ Copying was blocked — copy the text below yourself.'}</b> <b>Paste it (${PASTE})</b> into your AI window (Claude Code, Gemini CLI …).<small class="keys">Chat-only AIs (like the Gemini app) can't open your folders, so they can only give advice, not make the changes.</small>`)+`<pre>${esc(t)}</pre>`;
+  if($('exp').hidden){$('exp').hidden=false;eShow(0)}eOut(how,!ok)}
+async function grab(ts){   // 장면 사진 — 숨긴 영상으로 시간마다 한 장(각 3초 안에 못 받으면 건너뜀)
+  const c=document.createElement('video');c.muted=true;c.preload='auto';c.src=vid.currentSrc||vid.src;
+  await Promise.race([new Promise(ok=>c.addEventListener('loadeddata',ok,{once:true})),new Promise((_,no)=>setTimeout(()=>no(new Error('영상을 읽지 못했습니다')),15000))]);
+  const cv=document.createElement('canvas'),out={};
+  for(const [i,t] of ts.entries()){eOut(`장면 사진 만드는 중 ${i+1} / ${ts.length}…`);
+    const ok=await Promise.race([new Promise(r=>{c.addEventListener('seeked',()=>r(1),{once:true});c.currentTime=Math.min(Math.max(t,0)+.01,(c.duration||t+1)-.05)}),new Promise(r=>setTimeout(()=>r(0),3000))]);
+    if(!ok)continue;const W=300;cv.width=W;cv.height=Math.round(W*c.videoHeight/c.videoWidth);cv.getContext('2d').drawImage(c,0,0,cv.width,cv.height);out[t]=cv.toDataURL('image/jpeg',.82)}
+  c.removeAttribute('src');c.load();return out}
+function reportHtml(pics){const L=M(),left=L.filter(m=>!m.반영).length,W=L.filter(m=>m.전체),S=L.filter(m=>!m.전체);
+  const now=new Date().toLocaleString(LOC,{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  const st=m=>m.반영?`<div class="done">${KE('✓ 반영됨','✓ Done')} — ${esc(m.반영내용)}</div>`:'',tg=m=>m.분류?`<span class="tag">${esc(tr(m.분류))}</span>`:'';
+  return `<!doctype html><html lang="${LANG}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${KE('수정 요청','Change requests')} — ${esc(base(CUR))}</title><style>
+body{font:14px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:#1c2230;background:#fff;margin:0 auto;padding:28px 20px;max-width:860px}
+h1{font-size:21px;margin:0 0 4px}.meta{color:#667085;font-size:12.5px;margin:0 0 6px}.how{color:#667085;font-size:12.5px;margin:0 0 18px}
+h2{font-size:15px;margin:24px 0 6px;padding-bottom:5px;border-bottom:2px solid #1c2230}
+.it{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;padding:12px 0;border-bottom:1px solid #dfe3ea;break-inside:avoid}
+.it.np{grid-template-columns:minmax(0,1fr)}.it img{width:150px;border-radius:6px;display:block;background:#000}
+.hd{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.no{font-weight:700}.tm{color:#e5484d;font-weight:700;font-variant-numeric:tabular-nums}
+.tag{background:#7b4fd6;color:#fff;border-radius:999px;padding:0 8px;font-size:12px}.tx{white-space:pre-wrap;margin-top:4px;font-size:15px}
+.done{color:#18864f;font-size:12.5px;margin-top:4px}@page{size:A4;margin:14mm}
+</style></head><body><h1>${KE('영상 수정 요청','Video change requests')}</h1>
+<p class="meta">${KE(`영상: <b>${esc(base(CUR))}</b> · 길이 ${tf0(vid.duration)} · 메모 ${L.length}개 (고칠 것 ${left}개) · 정리한 때 ${now}`,`Video: <b>${esc(base(CUR))}</b> · length ${tf0(vid.duration)} · ${L.length} notes (${left} to fix) · made ${now}`)}</p>
+<p class="how">${KE('시간은 «분:초.0» 입니다(예: 1:04.5 = 1분 4.5초). 다 고치시면 고친 영상을 같은 이름으로 보내 주세요.','Times are min:sec.tenths (e.g. 1:04.5 = 1 min 4.5 s). When you are done, please send the fixed video back under the same name.')}</p>
+${W.length?`<h2>${KE('영상 전체','Whole video')}</h2>${W.map(m=>`<div class="it np"><div><div class="hd"><span class="no">${m.번호}.</span>${tg(m)}</div><div class="tx">${esc(m.글)}</div>${st(m)}</div></div>`).join('')}`:''}
+${S.length?`<h2>${KE('장면별 (시간 순)','By moment (in time order)')}</h2>${S.map(m=>`<div class="it${pics[m.시작]?'':' np'}">${pics[m.시작]?`<img src="${pics[m.시작]}" alt="${esc(m.시간)} ${KE('장면','still')}">`:''}<div><div class="hd"><span class="no">${m.번호}.</span><span class="tm">${esc(m.시간)}</span></div><div class="tx">${esc(m.글)}</div>${st(m)}</div></div>`).join('')}`:''}</body></html>`}
+async function exHuman(){if(BUSY)return;BUSY=true;try{const S=[...new Set(M().filter(m=>!m.전체).map(m=>m.시작))];const pics=S.length?await grab(S):{};
+    eOut('정리본 저장 중…');const j=await api('/api/report',{v:CUR,html:reportHtml(pics)});
+    eOut(KE('<b>👤 정리본을 저장했습니다.</b> 폴더 창에 보여 드렸습니다 — 카톡·메일로 보내시면 됩니다.','<b>👤 Summary saved.</b> It is shown in a folder window — send it by chat or email.')+`<pre>${esc(j.파일)}</pre>`)}
+  catch(e){eOut('⚠ 만들지 못했습니다: '+esc(e.message),1)}finally{BUSY=false}}
+const PNAME=KE({davinci:'다빈치 리졸브',fcp:'파이널 컷 프로',premiere:'프리미어 프로',capcut:'캡컷'},{davinci:'DaVinci Resolve',fcp:'Final Cut Pro',premiere:'Premiere Pro',capcut:'CapCut'});
+const PHOW=KE({davinci:'다빈치 리졸브에서 그 영상이 든 타임라인을 열고 → 위 메뉴 Timeline(타임라인) → Import(가져오기) → Timeline Markers from EDL → 이 파일. 타임라인 시작이 01:00:00:00 이 아니면 표시가 그만큼 밀립니다.',
+  fcp:'파이널 컷 프로 → 파일 → 가져오기 → XML → 이 파일. «수정 요청» 이벤트에 메모가 표시로 붙은 프로젝트가 생깁니다. 영상 위치가 다르면 «파일 다시 연결».',
+  premiere:'프리미어 프로 → 파일 → 가져오기 → 이 파일. 메모가 시퀀스 표시로 붙은 시퀀스가 생깁니다. 영상 위치가 다르면 «미디어 연결».',
+  capcut:'캡컷은 표시 파일을 불러오는 기능이 없습니다. 이 시간표(분:초:칸)를 보며 고치시면 됩니다. 사진이 필요하면 2번 «사람에게 넘기기»를 같이 보내 주세요.'},
+ {davinci:'In DaVinci Resolve, open the timeline with that video → menu Timeline → Import → Timeline Markers from EDL → this file. If the timeline does not start at 01:00:00:00, the markers shift by that much.',
+  fcp:'Final Cut Pro → File → Import → XML → this file. A project with your notes as markers appears in the “Change requests” event. If the video has moved, use “Relink Files”.',
+  premiere:'Premiere Pro → File → Import → this file. A sequence with your notes as markers appears. If the video has moved, use “Link Media”.',
+  capcut:'CapCut cannot import marker files. Work through this time list (min:sec:frame). If you need pictures, also send option 2 “Hand to a person”.'});
+async function exProg(k){if(BUSY)return;BUSY=true;eOut(KE(`${PNAME[k]}용 파일 만드는 중…`,`Making the ${PNAME[k]} file…`));
+  try{const j=await api('/api/export',{v:CUR,kind:k});eOut(KE(`<b>🎞 ${PNAME[k]}용 파일을 저장했습니다.</b> 폴더 창에 보여 드렸습니다.`,`<b>🎞 ${PNAME[k]} file saved.</b> It is shown in a folder window.`)+`<small class="keys">${esc(PHOW[k])}</small><pre>${esc(j.파일)}</pre>`)}
+  catch(e){eOut('⚠ 만들지 못했습니다: '+esc(e.message),1)}finally{BUSY=false}}
+function expPick(k){if(k==='ai')copyAI();else if(k==='human')exHuman();else if(k==='prog'){eShow(2);eOut('')}}
+$('exp').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.e)expPick(b.dataset.e);else if(b.dataset.p)exProg(b.dataset.p);else if(b.dataset.b){eShow(1);eOut('')}});
+$('exp').addEventListener('mousedown',e=>{if(e.target.id==='exp')expClose()});
+$('expb').onclick=expOpen;
+
+// ── ✅ 피드백 완료 (⇧Enter): 누르는 순간 요청 글(아직 안 넘긴 메모가 있는 영상 전부)을 복사 →
+//    1 알아서(영상마다 그 채널 클로드 창 · 없으면 새 창) · 2 한 창에 전체 · 3 영상별로 고르기 · 4 복사만
+const STAT=KE({idle:'쉬는 중',busy:'일하는 중',shell:'명령 실행 중'},{idle:'idle',busy:'working',shell:'running a command'}),home=p=>String(p||'').replace(/^\/Users\/[^/]+/,'~').replace(/^[A-Za-z]:\\Users\\[^\\]+/,'~');
+const PASTE=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent)?'⌘V':'Ctrl+V';
+const nmNew=()=>(HO.새창목록.find(x=>x[0]===HO.새창)||[0,HO.새창])[1];
+const autoWin=x=>x.자동.어디==='창'?HO.창.find(s=>s.이름===x.자동.창&&s.cfg===x.자동.cfg)||null:null;
+function hoPrep(){const A=HO.영상.map(autoWin),cnt=new Map();
+  HO.영상.forEach((x,i)=>{const a=A[i];x.ch=[...(a?[{k:'창',s:a,auto:1}]:[]),{k:'새창'},{k:'복사'},...HO.창.filter(s=>s!==a).map(s=>({k:'창',s}))];x.sel=0;x.open=true});
+  A.forEach(a=>a&&cnt.set(a,(cnt.get(a)||0)+1));   // «한 창에»: 영상을 가장 많이 받을 채널 창이 맨 위(처음 골라짐)
+  HO.one=[...[...HO.창].sort((a,b)=>(cnt.get(b)||0)-(cnt.get(a)||0)).map(s=>({k:'창',s,auto:cnt.has(s)})),{k:'새창',all:1}];HONE=0;HV=0}
+const wName=s=>s.창이름||s.이름;   // 터미널 탭에 보이는 이름(SM_감동듬뿍_새작업) — 없으면 클로드 안 주소(nunmul-1a)
+function chLab(c,x,short){
+  const mine=KE('이 채널 창','this folder’s window');
+  if(c.k==='창')return `💬 ${esc(wName(c.s))}`+(short?(c.auto?` <small>${mine}</small>`:''):` <small>${c.auto?mine+' · ':''}${esc(STAT[c.s.상태]||c.s.상태)} · ${esc(home(c.s.폴더))}${c.s.창이름?' · '+esc(c.s.이름):''}</small>`);
+  const at=esc(home(c.all?HO.공통:x?.폴더));
+  if(c.k==='새창')return KE('➕ 새 창','➕ New window')+(short?'':` <small>${esc(nmNew())} · ${KE(at+' 에서 켜기','start in '+at)}</small>`);
+  return KE('📋 복사만','📋 Copy only')+(short?'':` <small>${KE('직접 붙여 넣기','paste it yourself')}</small>`)}
+function hoRoute(){const G=new Map();   // 받을 곳마다 한 줄 — 새 창은 폴더마다 따로 열린다(서버와 같은 묶음)
+  HO.영상.forEach(x=>{const a=autoWin(x),k=a?'창:'+a.이름+'\n'+a.cfg:'새:'+x.폴더;G.has(k)||G.set(k,{t:a?'💬 '+wName(a):KE('➕ 새 창','➕ New window'),xs:[]});G.get(k).xs.push(x)});
+  return [...G.values()].map(({t,xs})=>`<span>${esc(t)} ← ${esc([...new Set(xs.map(x=>x.이름))].join(' · '))} ${xs.length}${KE('편',xs.length>1?' videos':' video')}</span>`).join('')}
+function hoOpen(){if(!$('ho').hidden)return;$('ho').hidden=false;HO=null;HS='load';hoShow();awayNote(KE('✅ 피드백 완료 창','✅ The Done panel'));
+  const P=api('/api/handoff'),txt=P.then(j=>{if(!j.글)throw new Error(KE('넘길 글 없음','nothing to send'));return j.글});
+  // 브라우저는 «누른 순간»에만 복사를 허락한다 — 글은 서버가 만드는 중이라 «곧 올 글»로 바로 넘기고, 안 되면 받은 뒤 한 번 더
+  let cp;try{cp=navigator.clipboard.write([new ClipboardItem({'text/plain':txt.then(t=>new Blob([t],{type:'text/plain'}))})])}catch(e){cp=Promise.reject(e)}
+  cp=cp.then(()=>1,()=>txt.then(t=>navigator.clipboard.writeText(t)).then(()=>1,()=>0));
+  P.then(async j=>{HO=j;if(!HO.영상.length){HS='none';return hoShow()}hoPrep();HO.복사=await cp;HS='main';hoShow()})
+   .catch(e=>{HS='err';hoShow(e.message)})}
+const hoClose=()=>{$('ho').hidden=true;HO=null;HS=''};
+function hoShow(err){const c=$('hocopy'),pick=HS==='one'||HS==='per';
+  $('hmain').hidden=HS!=='main';$('hone').hidden=HS!=='one';$('hper').hidden=HS!=='per';$('hosend').hidden=$('hoback').hidden=!pick;if(HS!=='done')$('hout').hidden=true;
+  $('hokeys').innerHTML=KE({main:'— 숫자 고르기 · <kbd>Enter</kbd> = 1 · <kbd>Esc</kbd> 닫기',one:'— <kbd>↑</kbd><kbd>↓</kbd> 고르기 · <kbd>Enter</kbd> 넘기기 · <kbd>⌫</kbd> 뒤로 · <kbd>Esc</kbd> 닫기',
+    per:'— <kbd>↑</kbd><kbd>↓</kbd> 영상 · <kbd>←</kbd><kbd>→</kbd> 받을 곳 · <kbd>Space</kbd> 펼치기 · <kbd>Enter</kbd> 넘기기 · <kbd>⌫</kbd> 뒤로'},
+   {main:'— pick a number · <kbd>Enter</kbd> = 1 · <kbd>Esc</kbd> close',one:'— <kbd>↑</kbd><kbd>↓</kbd> pick · <kbd>Enter</kbd> send · <kbd>⌫</kbd> back · <kbd>Esc</kbd> close',
+    per:'— <kbd>↑</kbd><kbd>↓</kbd> video · <kbd>←</kbd><kbd>→</kbd> destination · <kbd>Space</kbd> open · <kbd>Enter</kbd> send · <kbd>⌫</kbd> back'})[HS]||KE('— <kbd>Esc</kbd> 닫기','— <kbd>Esc</kbd> close');
+  if(HS==='load'){c.className='hcopy';c.textContent='넘길 메모를 모으는 중…';return}
+  if(HS==='err'){c.className='hcopy bad';c.textContent='⚠ '+err;return}
+  if(HS==='none'){c.className='hcopy';c.textContent='넘길 메모가 없습니다 — 모두 반영됐습니다.';return}
+  if(!HO)return;
+  const nn=HO.영상.reduce((a,x)=>a+x.남음,0);c.className='hcopy'+(HO.복사?'':' bad');
+  const nv=HO.영상.length;
+  c.innerHTML=(HO.다시?KE('<div><b>새 메모가 없어 이미 넘긴 메모를 다시 넘깁니다.</b></div>','<div><b>No new notes, so the notes already sent go again.</b></div>'):'')+(HO.복사
+    ?KE(`<div><b>📋 요청 글을 복사했습니다</b> — 영상 ${nv}편 · 고칠 메모 ${nn}개. 아무 AI 창에나 붙여 넣으면 됩니다(${PASTE}).</div>`,`<div><b>📋 Request copied</b> — ${nv} video(s) · ${nn} note(s) to fix. Paste it into any AI window (${PASTE}).</div>`)
+    :KE(`<div><b>⚠ 복사가 막혔습니다</b> — 아래 글을 직접 복사하세요 (영상 ${nv}편 · 고칠 메모 ${nn}개).</div>`,`<div><b>⚠ Copying was blocked</b> — copy the text below yourself (${nv} video(s) · ${nn} note(s) to fix).</div>`))+
+    `<details${HO.복사?'':' open'}><summary>${KE('복사된 글 보기','Show the copied text')}</summary><pre>${esc(HO.글)}</pre></details>`;
+  $('hocmd').innerHTML=HO.새창목록.map(([k,n])=>`<option value="${esc(k)}"${k===HO.새창?' selected':''}>${esc(n)}</option>`).join('')+
+    (HO.새창목록.some(x=>x[0]===HO.새창)?'':`<option value="${esc(HO.새창)}" selected>${esc(HO.새창)}</option>`)+`<option value="__직접">${KE('직접 적기…','Type a command…')}</option>`;
+  if(HS==='main')$('horoute').innerHTML=hoRoute();
+  if(HS==='one'){$('hone').innerHTML=KE(`<p class="keys">영상 ${HO.영상.length}편 전부를 받을 곳 하나를 고르세요.</p>`,`<p class="keys">Pick one destination for all ${HO.영상.length} video(s).</p>`)+HO.one.map((o,i)=>`<button type="button" class="ht${i===HONE?' on':''}" data-o="${i}"><span class="rd">${i===HONE?'●':'○'}</span>${i<9?`<kbd>${i+1}</kbd>`:''}<span>${chLab(o)}</span></button>`).join('');
+    $('hone').querySelector('.ht.on')?.scrollIntoView({block:'nearest'})}
+  if(HS==='per'){$('hper').innerHTML=HO.영상.map((x,i)=>`<div class="hv${i===HV?' on':''}"><button type="button" class="hvh" data-x="${i}"><span class="nm">🎬 ${esc(base(x.v))} <small class="keys">${esc(x.이름)} · ${KE(`메모 ${x.남음}개 ${x.open?'▴':'▾ 바꾸기'}`,`${x.남음} note(s) ${x.open?'▴':'▾ change'}`)}</small></span><span class="to">→ ${chLab(x.ch[x.sel],x)}</span></button>`+
+      (x.open?`<div class="hcs">${x.ch.map((o,ci)=>`<button type="button" class="hc${ci===x.sel?' on':''}" data-i="${i}" data-c="${ci}"${o.k==='창'?` title="${esc(home(o.s.폴더))}"`:''}><span class="rd">${ci===x.sel?'●':'○'}</span>${chLab(o,x,1)}</button>`).join('')}</div>`:'')+'</div>').join('');
+    $('hper').querySelector('.hv.on')?.scrollIntoView({block:'nearest'})}}
+function hoBody(mode){const to=(x,c)=>c.k==='창'?{v:x.v,어디:'창',창:c.s.이름,cfg:c.s.cfg}:{v:x.v,어디:c.k,한곳:c.all?1:0};
+  if(mode==='auto')return HO.영상.map(x=>to(x,x.ch[0]));          // 영상마다 맨 앞 = 그 채널 창(없으면 새 창)
+  if(mode==='copy')return HO.영상.map(x=>({v:x.v,어디:'복사'}));
+  if(mode==='one')return HO.영상.map(x=>to(x,HO.one[HONE]));
+  return HO.영상.map(x=>to(x,x.ch[x.sel]))}
+function hoMain(k){if(k==='one'||k==='per'){HS=k;hoShow()}else hoSend(k)}
+async function hoSend(mode){if(!HO||BUSY||!HO.영상.length||!['auto','one','per','copy'].includes(mode))return;BUSY=true;const body={보내기:hoBody(mode),다시:HO.다시};HS='done';hoShow();
+  const o=$('hout');o.hidden=false;o.classList.remove('bad');o.textContent=body.보내기.some(b=>b.어디==='창')?'클로드 창에 넣는 중… (창마다 10초쯤)':'넘기는 중…';
+  try{const j=await api('/api/handoff',body);o.classList.toggle('bad',j.결과.some(r=>!r.ok));
+    o.innerHTML=j.결과.map(r=>'<div>'+(r.ok?KE(`✅ <b>${esc(r.이름)}</b> (${r.편}편 · 메모 ${r.메모}개) → ${r.어디==='새 창'?'새 창을 열었습니다':r.어디==='복사'?'복사만 했습니다 (넘긴 것으로 표시)':esc(r.어디)+' 창에 넣었습니다'}`,
+        `✅ <b>${esc(r.이름)}</b> (${r.편} video(s) · ${r.메모} note(s)) → ${r.어디==='새 창'?'opened a new window':r.어디==='복사'?'copied only (marked as sent)':'sent to the window '+esc(r.어디)}`)
+      :KE(`⚠ <b>${esc(r.이름)}</b> 못 넘겼습니다 — ${esc(r.오류)} · 복사된 글을 붙여 넣으세요`,`⚠ <b>${esc(r.이름)}</b> not sent — ${esc(r.오류)} · paste the copied text instead`))+'</div>').join('')||KE('넘길 영상이 없습니다','No videos to send');
+    if(CUR)take(await api('/api/fb?v='+encodeURIComponent(CUR)))}
+  catch(e){o.classList.add('bad');o.textContent='⚠ '+e.message}finally{BUSY=false}}
+async function hoSetCmd(cmd){try{const j=await api('/api/set',{새창:cmd});if(HO){HO.새창=j.새창;hoShow()}}catch(e){say(e.message,'cmsg')}}
+$('hob').onclick=hoOpen;$('hosend').onclick=()=>hoSend(HS);$('hoback').onclick=()=>{if(HS==='one'||HS==='per'){HS='main';hoShow()}};
+$('ho').addEventListener('mousedown',e=>{if(e.target.id==='ho')hoClose()});
+$('hmain').addEventListener('click',e=>{const b=e.target.closest('[data-h]');if(b&&HO&&!BUSY)hoMain(b.dataset.h)});
+$('hone').addEventListener('click',e=>{const b=e.target.closest('[data-o]');if(b){HONE=+b.dataset.o;hoShow()}});
+$('hper').addEventListener('click',e=>{const c=e.target.closest('[data-c]'),h=e.target.closest('[data-x]');
+  if(c){const i=+c.dataset.i,x=HO.영상[i];x.sel=+c.dataset.c;x.open=false;HV=i;return hoShow()}   // 고르면 접혀서 고른 것만 보인다
+  if(h){const i=+h.dataset.x,x=HO.영상[i];x.open=!x.open;HV=i;hoShow()}});
+$('hocmd').addEventListener('change',e=>{const v=e.target.value;e.target.blur();if(v==='__직접'){$('hocus').hidden=false;$('hocus').focus()}else hoSetCmd(v)});
+$('hocus').addEventListener('keydown',e=>{if(e.isComposing||e.keyCode===229)return;if(e.key==='Enter'){e.preventDefault();const v=$('hocus').value.trim();if(v){hoSetCmd(v);$('hocus').hidden=true;$('hocus').blur()}}
+  else if(e.key==='Escape'){e.preventDefault();$('hocus').hidden=true;$('hocus').blur();if(HO)hoShow()}});
+
+// ── 새 판 알림 · 다시 불러오기
+async function reloadV(){const t=vid.currentTime;const j=await api('/api/fb?v='+encodeURIComponent(CUR));VM=j.vm;take(j);
+  vid.src='/v?v='+encodeURIComponent(CUR)+'&m='+VM+'&t='+encodeURIComponent(T);vid.addEventListener('loadedmetadata',()=>seek(t),{once:true});$('newv').hidden=true}
+$('reload').onclick=reloadV;
+
+
+//  · 칸 사이 세로 줄: 끌면 너비 · 끝까지 밀면 접힘 · 누르면 다시 폄 · 두 번 누르면 처음 너비
+//  · ⧉: 그 칸을 따로 띄운 창으로 옮긴다(같은 칸을 옮기는 것이라 기능은 그대로) · 창을 닫거나 «↩ 원래 자리로»면 제자리로
+//  · 단축키는 어느 창에서 눌러도 같다. 브라우저는 띄운 창이 원래 창을 앞으로 데려오는 것을 막아서(원래 창 → 띄운 창은 됨),
+//    띄운 창에서 M · G · E 를 누르면 메모 칸이 잠깐 그 창 아래로 온다(남기거나 Esc 면 제자리로)
+//  · 영상 칸을 옮기면 크롬은 영상을 다시 읽는다(11/7 시험: 옮긴 순간 readyState 0) → 보던 자리 · 속도 · 재생 여부를 되살린다
+//  · 배치(너비 · 접힘 · 띄운 창 자리·크기)는 서버 설정 «배치» — 주소(포트)가 바뀌어도 그대로
+const MODS={v:['mod-v',KE('🎬 영상','🎬 Video')],m:['memo',KE('✏️ 메모 쓰기','✏️ Note')],l:['list',KE('📋 피드백 목록','📋 Feedback list')],f:['files',KE('📁 폴더·영상','📁 Folders')]},HOME={},EL={},G=document.querySelector('.g');
+let LAY={},LAYOK=0,LW=window,LAYT=0,GUEST=null;
+const popped=k=>live(POP[k]);
+function lay(){const nl=!!LAY.nl||popped('f'),nr=!!LAY.nr||popped('l');   // 띄운 칸의 자리는 접는다
+  G.style.setProperty('--wl',(nl?0:LAY.l||250)+'px');G.style.setProperty('--wr',(nr?0:LAY.r||360)+'px');
+  G.classList.toggle('nol',nl);G.classList.toggle('nor',nr);$('spl').classList.toggle('shut',nl);$('spr').classList.toggle('shut',nr);
+  $('pops').innerHTML=Object.keys(MODS).filter(popped).map(k=>`<button type="button" data-back="${k}" title="띄운 창을 닫고 제자리로">↩ ${MODS[k][1]}</button>`).join('')}
+$('pops').onclick=e=>{const k=e.target.closest('[data-back]')?.dataset.back;if(k)popBack(k)};
+function saveLay(){clearTimeout(LAYT);LAYT=setTimeout(()=>api('/api/set',{배치:LAY}).catch(()=>{}),500)}
+function layReset(){Object.keys(MODS).forEach(k=>popBack(k));LAY={w:LAY.w};lay();saveLay();say('칸을 모두 제자리 · 처음 너비로 돌렸습니다','hmsg')}   // 띄운 창 자리는 기억해 둔다
+function spDown(e){if(e.button)return;const sp=e.currentTarget,L=sp.dataset.s==='l',k=L?'f':'l',x0=e.clientX;let moved=false;
+  sp.setPointerCapture(e.pointerId);e.preventDefault();
+  const mv=ev=>{if(popped(k)||!moved&&Math.abs(ev.clientX-x0)<4)return;moved=true;sp.classList.add('drag');
+    const R=G.getBoundingClientRect(),cs=getComputedStyle(G),pl=parseFloat(cs.paddingLeft),pr=parseFloat(cs.paddingRight);
+    const other=L?(G.classList.contains('nor')?0:LAY.r||360):(G.classList.contains('nol')?0:LAY.l||250);
+    const max=R.width-pl-pr-24-360-other,w=L?ev.clientX-R.left-pl-6:R.right-pr-ev.clientX-6,shut=w<(L?110:150);
+    if(L){LAY.nl=shut;if(!shut)LAY.l=Math.round(Math.max(170,Math.min(w,max)))}else{LAY.nr=shut;if(!shut)LAY.r=Math.round(Math.max(250,Math.min(w,max)))}
+    lay()};
+  const up=()=>{sp.removeEventListener('pointermove',mv);sp.removeEventListener('pointerup',up);sp.removeEventListener('pointercancel',up);sp.classList.remove('drag');
+    if(moved)return saveLay();
+    if(popped(k))return popBack(k);                                                   // 띄운 칸 자리(접힌 줄)를 누르면 제자리로
+    if(L?LAY.nl:LAY.nr){if(L)LAY.nl=false;else LAY.nr=false;lay();saveLay()}};   // 접힌 칸은 누르면 다시 편다
+  sp.addEventListener('pointermove',mv);sp.addEventListener('pointerup',up);sp.addEventListener('pointercancel',up)}
+for(const id of ['spl','spr']){$(id).addEventListener('pointerdown',spDown);
+  $(id).addEventListener('dblclick',e=>{if(e.currentTarget.dataset.s==='l'){delete LAY.l;LAY.nl=false}else{delete LAY.r;LAY.nr=false}lay();saveLay()})}
+const keepPlay=()=>vid.currentSrc?{t:vid.currentTime,p:vid.paused,r:vid.playbackRate}:null;
+function resume(s){const go=()=>{vid.playbackRate=s.r;seek(s.t);if(!s.p)vid.play().catch(()=>say('Space 를 누르면 이어서 재생합니다'))};
+  if(vid.readyState<1)vid.addEventListener('loadedmetadata',go,{once:true});else go()}
+function toast(w,t){const d=w.document;let e=d.querySelector('body>.toast');if(!e){e=d.createElement('div');e.className='toast';d.body.append(e)}
+  e.textContent=t;e.hidden=false;clearTimeout(e.tm);e.tm=setTimeout(()=>{e.hidden=true},4000)}
+function awayNote(n){if(live(LW)&&LW!==window)toast(LW,KE(`${n}은 원래 창에 열렸습니다 — 그쪽에서 이어서 하세요`,`${n} opened in the main window — continue there`))}
+function popTitle(){const nm=CUR?nf(CUR).split(/[\\/]/).pop():'';
+  for(const k in POP)if(live(POP[k]))POP[k].document.title=(k==='v'&&nm?nm:MODS[k][1].replace(/^\S+\s/,''))+KE(' — 영상 피드백',' — Video Feedback')}
+function popOut(k){if(popped(k))return POP[k].focus();
+  if(k==='m')memoHome();
+  const [id,name]=MODS[k],el=$(id),g=(LAY.w||{})[k]||{},big=k==='v';
+  const W=g.w||(big?960:k==='m'?640:440),H=g.h||(big?700:k==='m'?330:760);
+  const pw=open('','fbpop_'+k,`popup,width=${W},height=${H}`+(g.x!=null?`,left=${g.x},top=${g.y}`:''));
+  if(!pw){const t=KE('브라우저가 새 창을 막았습니다 — 주소창 끝의 «팝업 차단» 표시를 눌러 이 페이지는 «항상 허용»으로 해 주세요','The browser blocked the new window — click the pop-up icon at the end of the address bar and choose “Always allow” for this page');say(t,'hmsg');if(live(LW)&&LW!==window)toast(LW,t);return}
+  const d=pw.document;d.open();d.write(`<!doctype html><html lang="${LANG}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${KE('영상 피드백','Video Feedback')}</title></head><body class="pop"></body></html>`);d.close();
+  const st=d.createElement('style');st.textContent=[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n');d.head.append(st);
+  const hd=d.createElement('div');hd.className='phd';
+  hd.innerHTML=`<b>${name}</b><span class="grow"></span>`+(big?'<button type="button" data-a="fs" title="이 창을 화면 가득 (Esc 로 나오기)">⛶ 전체 화면</button>':'')+
+    `<button type="button" data-a="scr" hidden title="다음에 열 때도 이 모니터 자리에 열리게 브라우저 허락을 받습니다">🖥 다음에도 이 모니터에</button><button type="button" data-a="back">↩ 원래 자리로${big?'<kbd>W</kbd>':''}</button>`;
+  hd.onclick=e=>{const a=e.target.closest('[data-a]')?.dataset.a;
+    if(a==='back')popBack(k);else if(a==='scr')askScreens(k);
+    else if(a==='fs')d.fullscreenElement?d.exitFullscreen():d.documentElement.requestFullscreen().catch(()=>toast(pw,'이 브라우저는 창 전체 화면을 막았습니다 — 영상 위 ⛶ 단추를 쓰세요'))};
+  d.body.append(hd);
+  const ph=document.createElement('div');ph.className='box ph';if(el.dataset.col)ph.dataset.col=el.dataset.col;
+  ph.innerHTML=`<span>⧉ <b>${name}</b> 칸은 따로 띄운 창에 있습니다</span><button type="button" data-a="show">그 창 보기</button><button type="button" data-a="back">↩ 여기로 되돌리기</button>`;
+  ph.onclick=e=>{const a=e.target.closest('[data-a]')?.dataset.a;if(a==='show'&&popped(k))POP[k].focus();else if(a==='back')popBack(k)};
+  const keep=big&&keepPlay();
+  el.replaceWith(ph);d.body.append(el);HOME[k]=ph;EL[k]=el;POP[k]=pw;
+  if(keep)resume(keep);
+  pw.addEventListener('keydown',onKey);d.addEventListener('click',blurBtn);pw.addEventListener('pointerdown',()=>{LW=pw},true);
+  pw.addEventListener('pagehide',()=>popBack(k));   // 창을 닫으면 칸이 제자리로
+  pw.addEventListener('resize',()=>keepGeo(k));
+  trWatch(d);popTitle();lay();place(k,g)}
+function popBack(k){const ph=HOME[k],el=EL[k],w=POP[k];if(!ph)return;
+  keepGeo(k);if(GUEST)memoHome();
+  delete HOME[k];delete EL[k];delete POP[k];
+  const keep=k==='v'&&keepPlay();
+  ph.replaceWith(el);if(keep)resume(keep);
+  if(live(w))w.close();
+  lay()}
+function keepGeo(k){const w=POP[k];if(!live(w)||w.document.fullscreenElement)return;
+  const n={x:w.screenX,y:w.screenY,w:w.innerWidth,h:w.innerHeight},o=(LAY.w||{})[k]||{};
+  if(n.w<200||n.h<150)return;
+  if(['x','y','w','h'].some(p=>o[p]!==n[p])){(LAY.w=LAY.w||{})[k]=n;saveLay()}}
+async function place(k,g){if(g.x==null)return;await new Promise(r=>setTimeout(r,400));const w=POP[k];if(!live(w))return;
+  if(Math.abs(w.screenX-g.x)<60&&Math.abs(w.screenY-g.y)<60)return;   // 지난 자리에 열렸다
+  try{const s=await navigator.permissions.query({name:'window-management'});   // 크롬·엣지: 다른 모니터 자리는 브라우저 허락이 있어야 열린다
+    if(s.state==='granted'){await w.getScreenDetails();w.moveTo(g.x,g.y)}
+    else if(s.state==='prompt'){const b=w.document.querySelector('.phd [data-a=scr]');if(b)b.hidden=false}}catch(e){}}
+async function askScreens(k){const w=POP[k];if(!live(w))return;const b=w.document.querySelector('.phd [data-a=scr]');
+  try{await w.getScreenDetails();const g=(LAY.w||{})[k];if(g)w.moveTo(g.x,g.y);b.hidden=true;toast(w,'다음부터 이 모니터 자리에 열립니다')}
+  catch(e){b.hidden=true;toast(w,'허락을 받지 못했습니다 — 창을 끌어 옮기면 됩니다')}}
+function memoTo(){const w=live(LW)?LW:window;let m=$('memo');   // 메모 칸이 있는 창을 앞으로 — 원래 창은 앞으로 못 데려와서 메모 칸이 그 창으로 간다
+  if(GUEST&&m.ownerDocument.defaultView!==w){memoHome();m=$('memo')}
+  const mw=m.ownerDocument.defaultView;if(w===mw)return;
+  if(mw!==window){try{mw.focus()}catch(e){}return}
+  GUEST=document.createComment('memo');m.replaceWith(GUEST);m.classList.add('guest');w.document.body.append(m)}
+function memoHome(){if(!GUEST)return;const m=$('memo');m.classList.remove('guest');GUEST.replaceWith(m);GUEST=null}
+$('memo').addEventListener('focusout',()=>setTimeout(()=>{const m=$('memo');if(GUEST&&!m.contains(m.ownerDocument.activeElement))memoHome()},150));
+document.querySelectorAll('.popb').forEach(b=>{b.onclick=()=>popOut(b.dataset.pop)});
+addEventListener('pointerdown',()=>{LW=window},true);
+addEventListener('pagehide',()=>{for(const k in POP)if(live(POP[k]))POP[k].close()});   // 페이지를 새로 읽으면 띄운 창도 닫는다(W 로 다시 띄우기)
+setInterval(()=>{for(const k of Object.keys(HOME)){if(popped(k))keepGeo(k);else popBack(k)}},2000);   // 옮긴 자리 기억 · 소리 없이 닫힌 창도 제자리로
+
+// ── 단축키 — 한글 입력 상태에서도 되게 글자(e.key)가 아니라 자판 위치(e.code)로 본다 · 띄운 창에서 눌러도 같다
+const blurBtn=e=>{const b=e.target.closest('button');if(b)b.blur()};
+document.addEventListener('click',blurBtn);   // 누른 단추가 Space·Enter 를 가로채지 않게
+addEventListener('keydown',onKey);
+function onKey(e){LW=e.view||window;
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.metaKey||e.ctrlKey||e.isComposing)return;
+  const c=e.code,s=e.shiftKey,run=f=>{e.preventDefault();f()};
+  if(!$('about').hidden){if(c==='Escape')run(aboutToggle);return}
+  if(!$('mw').hidden){if(c==='Escape')run(mwClose);return}
+  if(!$('ho').hidden){const n=+(/^Digit([1-9])$/.exec(c)?.[1]||0),ent=c==='Enter'||c==='NumpadEnter',ud=c==='ArrowDown'?1:c==='ArrowUp'?-1:0;
+    if(c==='Escape')return run(hoClose);
+    if(!HO||BUSY)return;
+    if(HS==='main'){if(ent)return run(()=>hoMain('auto'));if(n&&n<=4)return run(()=>hoMain(['auto','one','per','copy'][n-1]));return}
+    if(HS!=='one'&&HS!=='per')return;
+    if(c==='Backspace')return run(()=>{HS='main';hoShow()});
+    if(ent)return run(()=>hoSend(HS));
+    if(HS==='one'){if(ud)return run(()=>{HONE=Math.max(0,Math.min(HO.one.length-1,HONE+ud));hoShow()});if(n&&n<=HO.one.length)return run(()=>{HONE=n-1;hoShow()});return}
+    const x=HO.영상[HV];
+    if(ud)return run(()=>{HV=Math.max(0,Math.min(HO.영상.length-1,HV+ud));hoShow()});
+    if(c==='ArrowLeft'||c==='ArrowRight')return run(()=>{x.sel=(x.sel+(c==='ArrowRight'?1:-1)+x.ch.length)%x.ch.length;hoShow()});
+    if(c==='Space')return run(()=>{x.open=!x.open;hoShow()});
+    return}
+  if(!$('help').hidden){if(c==='Escape'||c==='Slash')run(helpToggle);return}
+  if(!$('pal').hidden)return;
+  if(!$('exp').hidden){const n=/^Digit([1-4])$/.exec(c)?.[1];
+    if(c==='Escape')return run(expClose);
+    if(c==='Backspace')return run(()=>{eShow(1);eOut('')});
+    if(n)return run(()=>{if(!$('e2').hidden)exProg(['davinci','fcp','premiere','capcut'][n-1]);else if(n<4)expPick(['ai','human','prog'][n-1])});
+    return}
+  if(c==='Slash'&&s)return run(helpToggle);
+  if(c==='KeyF')return run(s?pickF:palOpen);
+  if(c==='Backspace')return run(upDir);
+  if(c==='BracketLeft')return run(()=>stepVideo(-1));
+  if(c==='BracketRight')return run(()=>stepVideo(1));
+  if(c==='KeyR'&&!$('newv').hidden)return run(reloadV);
+  if(c==='Enter'&&s)return run(hoOpen);   // ✅ 피드백 완료 — 지금 영상이 없어도 된다(여러 편을 한꺼번에)
+  if(c==='KeyG'&&s)return run(multiKey);   // 여러 영상 고르기 → 한 번 더 = 고른 영상에 전체 메모
+  if(c==='Escape'&&MULTI)return run(()=>multiOn(false));
+  if(c==='KeyW')return run(()=>s?layReset():popped('v')?popBack('v'):popOut('v'));   // ⧉ 영상 따로 띄우기 · ⇧W 모두 제자리로
+  if(!CUR)return;
+  const K={Space:togglePlay,KeyK:togglePlay,ArrowLeft:()=>s?nudge(-.1):seekBy(-2),ArrowRight:()=>s?nudge(.1):seekBy(2),
+    KeyJ:()=>seekBy(-10),KeyL:()=>seekBy(10),Comma:()=>nudge(-FPS),Period:()=>nudge(FPS),Digit0:()=>seek(0),Home:()=>seek(0),End:()=>seek(vid.duration),
+    KeyS:cycleSpeed,KeyM:markHere,Enter:markHere,KeyI:rangeA,KeyO:rangeB,KeyX:()=>s?delMany('all'):rangeClear(),KeyG:globalMemo,KeyV:()=>togglePick(SEL),
+    ArrowUp:()=>selMove(-1),ArrowDown:()=>selMove(1),
+    KeyE:()=>s?expOpen():SEL&&startEdit(SEL),KeyC:()=>s?copyAI():SEL&&toggleDone(SEL),KeyD:()=>s?delMany('sel'):SEL&&delAsk(SEL)};
+  if(K[c])run(K[c])}
+
+// 클로드가 반영 표시를 하거나 영상을 새로 만들면 4초 안에 보인다(페이지나 띄운 창 하나라도 보일 때만)
+setInterval(async()=>{if(!CUR||document.hidden&&!Object.values(POP).some(w=>live(w)&&!w.document.hidden))return;try{const j=await api('/api/fb?v='+encodeURIComponent(CUR));take(j);if(j.vm!==VM)$('newv').hidden=false}catch(e){}},4000);
+const PV='{{버전}}';   // 새 판이 오면 서버가 스스로 다시 켜지고, 여기엔 «새로고침» 단추가 뜬다
+setInterval(()=>api('/api/ping').then(j=>{if(j.v&&j.v!==PV){const u=$('upd');u.hidden=false;u.textContent=`🔄 새 판 v${j.v} — 눌러서 새로고침`}}).catch(()=>say('페이지가 꺼졌습니다 — 영상피드백을 다시 여세요')),60000);
+$('upd').onclick=()=>location.reload();   // 탭이 열려 있는 동안은 안 꺼지게
+
+//    · EN: 글 전체가 같으면 · ENX: 숫자·이름이 섞인 글 · data-en: 단추·표가 섞인 칸은 통째로 · KE(): 코드가 만드는 긴 글
+//    · .notr · pre · textarea 안(사용자 메모 · 경로 · AI 요청 글)은 안 건드린다 · 바꾼 글은 한글이 없어 다시 안 건드림(되풀이 없음)
+const EN={
+'영상 피드백':'Video Feedback','🎬 영상 피드백':'🎬 Video Feedback','⌨ 단축키':'⌨ Shortcuts','🔎 영상·폴더 찾기':'🔎 Find','↑ 위 폴더':'↑ Up','📁 폴더 창':'📁 Choose folder',
+'☑ 여러 영상에 한꺼번에 메모':'☑ Note on several videos','고르기 풀기':'Unpick all','끝내기':'Done picking','폴더 · 영상':'Folders · Videos','왼쪽 목록 정렬':'Sort the list',
+'최근 영상순':'Newest first','이름순':'By name','오래된 순':'Oldest first','이전·다음 영상':'previous · next video',
+'이 칸을 따로 띄운 창으로 — 다른 모니터로 끌어 옮길 수 있습니다':'Pop this panel out into its own window — you can drag it to another monitor',
+'끌어서 칸 너비 조절 · 끝까지 밀면 접힘 · 두 번 누르면 처음 너비':'Drag to resize · push all the way to fold · double-click for the default width',
+'영상이 새로 바뀌었습니다(고친 판).':'This video was replaced (new version).','다시 불러오기':'Reload','누르면 그 자리로':'Click to jump there',
+'◀ 2초':'◀ 2 s','▶ 재생':'▶ Play','❚❚ 멈춤':'❚❚ Pause','2초 ▶':'2 s ▶',
+'영상을 따로 띄운 창으로 — 다른 모니터로 끌어 옮기고 크게 볼 수 있습니다':'Pop the video out into its own window — drag it to another monitor and make it big',
+'⧉ 영상 따로 띄우기':'⧉ Pop out video','[ 구간 시작':'[ Range start','구간 끝 ]':'Range end ]','구간 지우기':'Clear range','🌐 영상 전체 메모':'🌐 Whole-video note',
+'메모 쓰기 칸을 따로 띄운 창으로':'Pop the note panel out into its own window','이 장면에 메모 ·':'Note at this moment ·','이 구간에 메모 ·':'Note on this range ·',
+'어떻게 고칠지 적으세요 — 쓰기 시작하면 영상이 멈추고 그 시간이 붙습니다':'Write what to change — the video pauses and the time is attached as soon as you type',
+'남기기':'Save','쓰던 것 지우기':'Discard','피드백':'Feedback','✅ 피드백 완료 → AI':'✅ Done → AI','📤 내보내기':'📤 Export',
+'이름 일부를 치세요 · ↑↓ 고르기 · Enter 열기 · ⌫(빈 칸) 위 폴더 · Esc 닫기':'Type part of a name · ↑↓ pick · Enter open · ⌫ (empty) up a folder · Esc close',
+'🤖 AI에게 넘기기':'🤖 Hand to an AI','«어느 폴더의 어느 파일을 보라»는 글이 복사됩니다 → 쓰시는 AI 창에 붙여 넣기 (클로드·제미나이 등)':'Copies a request telling the AI which file in which folder to read → paste it into your AI window (Claude, Gemini …)',
+'👤 사람에게 넘기기':'👤 Hand to a person','장면 사진 · 시간 · 메모를 보기 좋게 정리한 PDF → 영상 폴더에 저장 · 카톡·메일로 보내기':'A tidy PDF with a still of each moment, its time and the note → saved in the video folder · send it by chat or email',
+'🎞 편집 프로그램으로':'🎞 To an editing app','메모가 편집 프로그램 타임라인에 표시로 붙는 파일 → 다음에서 프로그램 고르기':'A file that puts your notes on the app’s timeline as markers → pick the app next',
+'다빈치 리졸브':'DaVinci Resolve','.edl — 타임라인 메뉴 → 가져오기(Import) → Timeline Markers from EDL (타임라인 시작 01:00:00:00 기준)':'.edl — Timeline menu → Import → Timeline Markers from EDL (assumes the timeline starts at 01:00:00:00)',
+'파이널 컷 프로':'Final Cut Pro','.fcpxml — 파일 → 가져오기 → XML → «수정 요청» 이벤트에 표시가 붙은 프로젝트가 생김':'.fcpxml — File → Import → XML → a project with markers appears in the “Change requests” event',
+'프리미어 프로':'Premiere Pro','.xml — 파일 → 가져오기 → 표시가 붙은 시퀀스가 생김 (영상 위치가 다르면 «미디어 연결»)':'.xml — File → Import → a sequence with markers appears (if the video has moved, use “Link Media”)',
+'캡컷':'CapCut','캡컷은 표시 파일을 불러오는 기능이 없어 캡컷 화면 시간(분:초:칸)으로 적은 시간표(.txt)':'CapCut can’t import marker files, so you get a time list (.txt) in CapCut’s own time format (min:sec:frame)',
+'뒤로':'Back','✅ 피드백 완료':'✅ Done','⚡ 알아서 넘기기':'⚡ Send automatically','🖥 한 창에 전체 넘기기':'🖥 All to one window','모든 영상을 창 하나에 — 다음에서 창 고르기':'Every video to one window — pick the window next',
+'🎬 영상별로 고르기':'🎬 Choose per video','영상마다 받을 곳을 직접 고르기':'Pick where each video goes','📋 복사만 하고 끝내기':'📋 Just copy',
+'다른 AI·사람에게 직접 붙여 넣기 — 넘긴 것으로 표시해 둡니다':'Paste it to another AI or a person yourself — the notes are marked as sent','넘기기':'Send','새 창으로 켤 AI':'AI for a new window',
+'명령 (예: gemini -i)':'Command (e.g. gemini -i)',
+'클로드 창에는 «클로드 창끼리 말 넣는 길»로만 넣습니다 — 그냥 터미널(개인 작업 창)에는 아무것도 치지 않습니다.':'Claude windows get the request only through Claude’s own window-to-window messages — nothing is ever typed into a plain terminal.',
+'고른 영상 모두에 똑같이 남길 메모 — 예: 색감을 조금 더 따뜻하게 · 배경음악 조금 줄이기':'One note for every picked video — e.g. a bit warmer color · music a little quieter',
+'재생':'Playback','메모 남기기':'Leaving notes','메모 목록 · 내보내기':'Note list · Export','영상 · 폴더':'Videos · Folders','화면 배치 (듀얼 모니터)':'Layout (two monitors)',
+'재생 · 멈춤':'Play · pause','2초 뒤 · 앞':'2 s back · forward','10초 뒤 · 앞':'10 s back · forward','0.1초 (멈춤)':'0.1 s (pauses)','한 칸(1/30초) (멈춤)':'One frame (1/30 s) (pauses)',
+'처음 · 끝':'Start · end','지금 장면에 메모 (멈추고 메모 칸으로)':'Note at this moment (pauses, goes to the note box)','구간 시작 · 구간 끝':'Range start · range end',
+'🌐 영상 전체 메모 (색감·LUT · 화질 · 프레임 등 — 시간 없음)':'🌐 Whole-video note (color/LUT, quality, frame rate … — no time)','메모 칸':'Note box',
+'영상 전체 메모의 갈래 고르기':'Pick a category for a whole-video note','쓰면서 재생 · 멈춤':'Play · pause while typing','나가기 (빈 칸이면 시간 풀림 · 고치던 것은 취소)':'Leave (an empty box lets go of the time · an edit is cancelled)',
+'이전 · 다음 메모 고르기 (그 장면으로)':'Previous · next note (jumps there)','고른 메모 고치기':'Edit the picked note','고른 메모 ✓ 완료 표시 바꾸기':'Toggle ✓ done on the picked note',
+'고른 메모 지우기 (3초 안에 두 번)':'Delete the picked note (twice within 3 s)','지울 것으로 고르기 · 풀기 (여러 개)':'Pick / unpick for deleting (several)','고른 것 지우기 (3초 안에 두 번)':'Delete the picked ones (twice within 3 s)',
+'이 영상 메모 전체 지우기 (3초 안에 두 번)':'Delete every note on this video (twice within 3 s)',
+'✅ 피드백 완료 — 요청 글이 바로 복사되고, 1 알아서 넘기기 · 2 한 창에 전체 · 3 영상별로 고르기 · 4 복사만':'✅ Done — the request is copied at once, then 1 send automatically · 2 all to one window · 3 per video · 4 just copy',
+'내보내기 창 (1 AI · 2 사람 · 3 편집 프로그램)':'Export menu (1 AI · 2 person · 3 editing app)','이 영상의 AI용 글만 바로 복사':'Copy this video’s AI request right away',
+'위 폴더 (찾기 창에서는 빈 칸일 때)':'Up a folder (in the finder: when the box is empty)','이 폴더의 이전 · 다음 영상':'Previous · next video in this folder','폴더 창(Finder·탐색기)으로 고르기':'Choose a folder in Finder / File Explorer',
+'고친 판 다시 불러오기':'Reload a replaced video','이 창 열기 · 닫기':'Open · close this list',
+'⧉ 영상 따로 띄우기 · 되돌리기 — 띄운 창을 다른 모니터로 끌어 키우기 (창 위 «⛶ 전체 화면»)':'⧉ Pop out the video · put it back — drag that window to another monitor and enlarge it (“⛶ Full screen” on top)',
+'폴더·영상 · 메모 쓰기 · 피드백 목록 칸도 따로 띄우기 — 창을 닫으면 제자리로':'Pop out the folder, note and feedback panels too — closing the window puts the panel back','칸 사이 줄':'Line between panels',
+'끌어서 너비 조절 · 끝까지 밀면 접힘 · 누르면 다시 폄 · 두 번 누르면 처음 너비':'Drag to resize · push all the way to fold · click to unfold · double-click for the default width',
+'띄운 칸 모두 제자리로 · 칸 너비 처음대로':'Put every panel back · default widths','단축키':'Shortcuts',
+'이 창을 화면 가득 (Esc 로 나오기)':'Fill the screen with this window (Esc to leave)','⛶ 전체 화면':'⛶ Full screen','다음에 열 때도 이 모니터 자리에 열리게 브라우저 허락을 받습니다':'Ask the browser to let this window open on this monitor next time too',
+'🖥 다음에도 이 모니터에':'🖥 Use this monitor next time','↩ 원래 자리로':'↩ Put back','칸은 따로 띄운 창에 있습니다':'panel is in its own window','그 창 보기':'Show that window','↩ 여기로 되돌리기':'↩ Bring it back here',
+'띄운 창을 닫고 제자리로':'Close the popped-out window and put the panel back','이 브라우저는 창 전체 화면을 막았습니다 — 영상 위 ⛶ 단추를 쓰세요':'This browser blocked window full screen — use the ⛶ button on the video',
+'다음부터 이 모니터 자리에 열립니다':'From now on it opens on this monitor','허락을 받지 못했습니다 — 창을 끌어 옮기면 됩니다':'No permission — just drag the window over',
+'칸을 모두 제자리 · 처음 너비로 돌렸습니다':'Every panel is back, at the default width','Space 를 누르면 이어서 재생합니다':'Press Space to keep playing',
+'답이 없습니다':'No answer from the server','최근 영상 확인 중…':'checking newest video…','확인 못 함(오래 걸림)':'could not check (took too long)','영상 없음':'no videos',
+'이 폴더에는 영상이 없습니다':'No videos in this folder','폴더를 여는 중…':'Opening the folder…','열린 폴더 창에서 폴더를 고르세요':'Choose a folder in the window that opened',
+'이 폴더의 마지막 영상입니다':'That was the last video in this folder','이 폴더의 첫 영상입니다':'This is the first video in this folder','이 폴더 고르기 풀기':'Unpick this folder',
+'왼쪽에서 영상을 고르세요':'Pick videos on the left','먼저 왼쪽에서 영상을 고르세요':'Pick videos on the left first','메모를 적어 주세요':'Write a note first','남기는 중…':'Saving…',
+'맞는 것이 없습니다':'Nothing matches','먼저 영상을 고르세요':'Pick a video first','영상 전체 메모를 남겼습니다':'Whole-video note saved','남겼습니다 — Space 로 이어 보기':'Saved — Space to keep watching',
+'영상 전체에 메모':'Note on the whole video','— 색감·LUT · 화질 · 프레임처럼 영상 전체에 대한 것 (갈래는 골라도 되고 안 골라도 됩니다)':'— about the whole video, like color/LUT, quality or frame rate (a category is optional)',
+'취소)':'to cancel)','영상 전체':'Whole video','🌐 영상 전체':'🌐 Whole video','✓ 완료됨':'✓ Done','완료 표시':'Mark done','고치기':'Edit','정말 지우기':'Really delete','지우기':'Delete',
+'D 두 번':'D twice','지울 것으로 고르기 (V)':'Pick for deleting (V)','D 를 한 번 더 누르면 지웁니다 (3초)':'Press D once more to delete (3 s)','메모가 아직 없습니다':'No notes yet',
+'🗑 전체 지우기':'🗑 Delete all','먼저 ↑↓ 로 메모를 고르세요':'Pick a note with ↑↓ first','먼저 V(또는 ✓ 칸)로 지울 메모를 고르세요':'First pick notes to delete with V (or the ✓ box)',
+'메모가 없습니다':'There are no notes','영상을 읽지 못했습니다':'Could not read the video','정리본 저장 중…':'Saving the summary…','넘길 메모를 모으는 중…':'Gathering the notes…',
+'넘길 메모가 없습니다 — 모두 반영됐습니다.':'Nothing to send — every note is done.','페이지가 꺼졌습니다 — 영상피드백을 다시 여세요':'The program has stopped — open Video Feedback again',
+'클로드 창에 넣는 중… (창마다 10초쯤)':'Sending to Claude windows… (about 10 s each)','넘기는 중…':'Sending…',
+'Language · 언어':'Language · 언어','색감·LUT':'Color/LUT','필터·효과':'Filters/effects','화질·해상도':'Quality/resolution','프레임(fps)':'Frame rate (fps)','음량·음악':'Volume/music','자막 모양':'Caption style','기타':'Other'};
+const ENX=[
+[/^속도 (.+)$/,'Speed $1'],[/^최근 영상 (.+)$/,'newest video $1'],[/^메모 (\d+)$/,n=>n+(n==='1'?' note':' notes')],[/^· 수정 완료 (\d+)$/,'· done $1'],
+[/^고른 영상 (\d+)편(?: \(다른 폴더 (\d+)편 포함\))?$/,(n,k)=>`${n} picked`+(k?` (${k} in other folders)`:'')],[/^이 폴더 영상 모두 \((\d+)\)$/,'All in this folder ($1)'],
+[/^🌐 고른 (\d+)편에 전체 메모$/,'🌐 Whole-video note on $1 picked'],[/^… 외 (\d+)편$/,'… and $1 more'],[/^고른 (\d+)편에 남기기$/,'Save on $1 picked'],
+[/^✅ (\d+)편에 남겼습니다 — 같은 영상들에 하나 더 써도 됩니다$/,'✅ Saved on $1 videos — you can write another one for the same videos'],[/^못 남겼습니다: ([\s\S]*)$/,'Could not save: $1'],
+[/^⌫ 위 폴더 — ([\s\S]*)$/,'⌫ Up a folder — $1'],[/^· 메모 (\d+) · 완료 (\d+)$/,'· notes $1 · done $2'],[/^저장 파일: ([\s\S]*)$/,'Saved in: $1'],
+[/^구간 (.+?) ~ (.+)$/,(a,b)=>`Range ${a} ~ ${b==='(끝: O)'?'(end: O)':b}`],[/^(\d+)번을 고쳤습니다$/,'Note $1 updated'],[/^(\d+)번 고쳐 남기기$/,'Save note $1'],
+[/^(\d+)번 메모 고치기 ·$/,'Editing note $1 ·'],[/^메모 (\d+) · 수정 완료\((\d+)\)(?: · 남음 (\d+))?$/,(n,d,l)=>`${n} notes · done (${d})`+(l?` · left ${l}`:'')],[/^(\d+)번$/,'#$1'],
+[/^→ 넘김 (.+?) · ([\s\S]+)$/,(t,w)=>`→ sent ${t} · ${({'복사':'copied','새 창':'new window'})[w]||w}`],
+[/^✓ 반영 (.+?) — ([\s\S]*)$/,(t,x)=>`✓ done ${t} — ${x==='직접 확인'?'checked by hand':x}`],[/^지난 반영: ([\s\S]*) → 다시 고쳐야 함$/,x=>`last change: ${x==='직접 확인'?'checked by hand':x} → needs another fix`],
+[/^(\d+)번을 지웠습니다$/,'Deleted note $1'],[/^정말 (\d+)개 지울까요\? 한 번 더$/,'Really delete $1? Press again'],[/^🗑 고른 것 지우기 \((\d+)\)$/,'🗑 Delete picked ($1)'],
+[/^정말 (\d+)개 모두 지울까요\? 한 번 더$/,'Really delete all $1? Press again'],[/^메모 (\d+)개를 모두 지웠습니다$/,'Deleted all $1 notes'],[/^고른 메모 (\d+)개를 지웠습니다$/,'Deleted $1 picked notes'],
+[/^장면 사진 만드는 중 (\d+) \/ (\d+)…$/,'Making stills $1 / $2…'],[/^⚠ 만들지 못했습니다: ([\s\S]*)$/,'⚠ Could not make it: $1'],[/^🔄 새 판 v(.+) — 눌러서 새로고침$/,'🔄 New version v$1 — click to reload']];
+const MISS=new Set();   // 표에 없는 한글 글(시험 때 본다 — 화면엔 한국어 그대로 나옴)
+function tr(s){if(LANG!=='en'||!s||!/[가-힣]/.test(s))return s;const t=s.replace(/\s+/g,' ').trim();let r=EN[t];
+  if(r==null)for(const [re,f] of ENX){const m=re.exec(t);if(m){r=typeof f==='function'?f(...m.slice(1)):t.replace(re,f);break}}
+  if(r==null){MISS.add(t);return s}
+  return s.match(/^\s*/)[0]+r+s.match(/\s*$/)[0]}
+const TRA=['title','placeholder','aria-label','alt'],NOTR='.notr,pre,textarea,script,style';
+function trEl(n){if(n.dataset&&n.dataset.en!=null){n.innerHTML=n.dataset.en;delete n.dataset.en}
+  for(const a of TRA){const v=n.getAttribute(a);if(v){const x=tr(v);if(x!==v)n.setAttribute(a,x)}}}
+function trNode(n){if(LANG!=='en'||!n)return;
+  if(n.nodeType===3){const p=n.parentElement;if(p&&!p.closest(NOTR)){const v=tr(n.nodeValue);if(v!==n.nodeValue)n.nodeValue=v}return}
+  if(n.nodeType!==1||n.closest(NOTR))return;
+  const w=n.ownerDocument.createTreeWalker(n,5,{acceptNode:x=>{if(x.nodeType!==1||!x.matches(NOTR))return 1;if(x.tagName==='TEXTAREA')trEl(x);return 2}});   // 글 칸은 안내 글(placeholder)만
+  for(let x=n;x;x=w.nextNode()){if(x.nodeType===1)trEl(x);else{const v=tr(x.nodeValue);if(v!==x.nodeValue)x.nodeValue=v}}}
+function trWatch(d){if(LANG!=='en')return;d.documentElement.lang='en';d.title=tr(d.title);trNode(d.body);
+  new MutationObserver(ms=>{for(const m of ms){if(m.type==='childList')m.addedNodes.forEach(trNode);else if(m.type==='characterData')trNode(m.target);else if(!m.target.closest(NOTR))trEl(m.target)}})
+    .observe(d.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:TRA})}
+trWatch(document);
+
+ls(DIR||'').then(()=>{if(CUR)openV(CUR)});
+</script>
+</body></html>
