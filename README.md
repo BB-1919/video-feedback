@@ -7,6 +7,7 @@ Watch your edit, pause, and leave notes pinned to the exact second. Then hand th
 - Runs only on your computer as a small page in your browser. Nothing is uploaded.
 - Works on Mac and Windows. All it needs is Python 3.9 or newer (free). Nothing else gets installed.
 - Comes in English and Korean (한국어). Switch any time with ⓘ at the top right.
+- Also works on a phone or tablet on the same Wi-Fi: press 📱 and scan the QR code.
 
 **한국어 안내 → [README.ko.md](README.ko.md)**
 
@@ -35,6 +36,8 @@ Install Video Feedback from https://github.com/BB-1919/video-feedback — follow
 | `G` | Note about the whole video (color, quality, volume …) |
 | `⇧G` | The same note on several videos at once |
 | `W` | Pop the video out into its own window, e.g. for a second monitor |
+| `Z` | **Dead zones**: see where YouTube Shorts, Instagram Reels, TikTok and X cover a vertical video with their buttons and text (`⇧Z` next app) |
+| 📱 | **Phone or tablet**: scan the QR code with a phone on the same Wi-Fi and leave notes there |
 | `⇧Enter` | **Done → AI**: copies a request to paste into any AI window. With Claude Code it can go straight into an open Claude window |
 | `⇧E` | **Export**: DaVinci `.edl` · Premiere `.xml` · Final Cut `.fcpxml` · CapCut time list · a tidy PDF for a person |
 | `?` | Every shortcut |
@@ -106,6 +109,9 @@ The app may be named `영상피드백.app` if it was made in Korean.
 ## Privacy
 
 The page runs on `127.0.0.1` (this computer only) and needs a private key that only the page knows. Video files never leave your computer. Nothing is sent to an AI until you press **Done → AI** yourself.
+
+- **Phone or tablet** (only when you press 📱): the page also opens on this computer's Wi-Fi address, for devices on the same home or office network only, with a new key each time. It turns itself off after 30 minutes without use on the phone, or after 3 wrong keys. Videos stream from your computer to your phone over your own Wi-Fi.
+- **Update check**: once a day it asks GitHub for the latest version number. Nothing about you or your videos is sent. Turn it off with ⓘ → Update check → Off.
 
 ---
 

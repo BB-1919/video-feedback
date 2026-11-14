@@ -23,7 +23,7 @@ header h1{margin:0;font-size:17px}
 #ver{background:none;border:0;padding:2px 4px;color:var(--faint);font-size:13px;line-height:1}
 #ver:hover{color:var(--sub)}
 .g{display:grid;grid-template-columns:250px minmax(0,1fr) 360px;gap:12px;padding:12px 16px;align-items:start}
-@media (max-width:1150px){.g{grid-template-columns:minmax(0,1fr)}#files{max-height:240px}}
+@media (max-width:1150px){.g{grid-template-columns:minmax(0,1fr)}#files{max-height:240px;position:static}}   /* 좁은 화면(폰)에서 폴더 칸이 위에 붙어 영상을 가리지 않게 */
 .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;min-width:0}
 #files{max-height:calc(100vh - 90px);overflow:auto;position:sticky;top:12px}
 #files h3{margin:2px 0 8px;font-size:13px;color:var(--sub);font-weight:600}
@@ -108,6 +108,34 @@ body.pop .popb{display:none}   /* 띄운 창에서는 머리 줄의 «↩ 원래
 #bar .rg{position:absolute;top:0;bottom:0;background:var(--rng)}
 #bar .tk{position:absolute;top:3px;bottom:3px;width:3px;margin-left:-1px;background:var(--acc);border-radius:2px}
 #bar .tk.ok{background:var(--ok)}
+
+#vbox{position:relative}
+#dz{position:absolute;inset:10px;pointer-events:none;container-type:size;z-index:1}
+#dzf{position:absolute;inset:0;margin:auto;width:min(100cqw,calc(100cqh * var(--ar,.5625)));height:min(100cqh,calc(100cqw / var(--ar,.5625)))}
+.dzr{position:absolute;background:rgba(var(--c),.34);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.dzr span{font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px #000,0 0 4px #000;padding:2px 4px;text-align:center;line-height:1.25}
+.dzr.v span{writing-mode:vertical-rl}
+.dzs{position:absolute;border:1.5px dashed rgba(var(--c),.95)}
+#dzf.many .dzr{background:rgba(var(--c),.2)}
+#dzf.many .dzr span{display:none}
+.dzw{position:absolute;left:6px;top:6px;max-width:calc(100% - 12px);background:rgba(0,0,0,.72);color:#fff;font-size:11.5px;padding:3px 7px;border-radius:6px}
+.dzb{display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap}
+.dzb>b{font-size:12px;color:var(--sub);font-weight:600}
+.dzb button[aria-pressed="true"]{background:rgb(var(--c));border-color:rgb(var(--c));color:#fff;font-weight:700}
+body.pop #vbox>#dz{inset:6px}
+@media (min-width:1151px){#mod-v>#vbox>#dz{inset:6px}}
+
+#rmb.on{border-color:var(--ok);color:var(--ok);font-weight:700}
+.rmg{display:grid;grid-template-columns:210px minmax(0,1fr);gap:16px;align-items:center}
+.qr{background:#fff;padding:4px;border-radius:10px}.qr svg{display:block;width:100%;height:auto}
+.rms{margin:0;padding-left:20px;display:grid;gap:6px}
+.rmu{font:12px/1.4 ui-monospace,SFMono-Regular,monospace;word-break:break-all;color:var(--sub)}
+@media (max-width:600px){.rmg{grid-template-columns:minmax(0,1fr)}.qr{max-width:240px}}
+.rem #pick,.rem #rmb,.rem #pops,.rem #nup,.touch .popb,.touch #hk{display:none!important}
+.touch button kbd,.touch #files h3 kbd,.touch .dzb kbd{display:none}
+.touch #memo p.keys,.touch #list>p.keys,.touch #mbar p.keys{display:none}
+.touch button{min-height:38px}
+.touch textarea,.touch input,.touch select{font-size:16px}   /* 16px 아래면 아이폰이 글 칸을 누를 때 화면을 확대한다 */
 #bar .tk.sl{width:5px;margin-left:-2px;background:var(--acc2)}
 #bar .seg{position:absolute;top:8px;height:10px;background:var(--acc);opacity:.45;border-radius:3px}
 #bar .seg.ok{background:var(--ok)}
@@ -219,7 +247,7 @@ li.it .sent{color:var(--acc2);font-size:12px}
 #langs [aria-pressed="true"]{border-color:var(--acc2);color:var(--acc2);font-weight:700}
 .abox pre{margin:6px 0 0;padding:6px 8px;background:var(--chip);border-radius:6px;font:11.5px/1.5 ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap;word-break:break-all;user-select:all}
 </style></head><body>
-<header><h1>🎬 영상 피드백</h1><span id="pops"></span><span id="hmsg"></span><span class="grow"></span><button id="upd" type="button" class="main" hidden></button><button id="hk" type="button">⌨ 단축키<kbd>?</kbd></button>
+<header><h1>🎬 영상 피드백</h1><span id="pops"></span><span id="hmsg"></span><span class="grow"></span><button id="upd" type="button" class="main" hidden></button><button id="nup" type="button" hidden></button><button id="rmb" type="button" hidden></button><button id="hk" type="button">⌨ 단축키<kbd>?</kbd></button>
 <button id="ver" type="button" title="About" aria-label="About">ⓘ</button></header>
 <div class="g">
   <aside class="box" id="files" data-col="l">
@@ -235,13 +263,14 @@ li.it .sent{color:var(--acc2);font-size:12px}
   <section id="stage">
    <div class="mod" id="mod-v">
     <div id="newv" hidden>영상이 새로 바뀌었습니다(고친 판). <button id="reload" type="button" class="main">다시 불러오기<kbd>R</kbd></button></div>
-    <div class="box" id="vbox"><div id="empty" data-en="Press <kbd>F</kbd> to pick a video (or click one on the left)"><kbd>F</kbd> 를 눌러 영상을 고르세요 (왼쪽에서 눌러도 됩니다)</div><video id="vid" controls preload="metadata" tabindex="-1" hidden></video></div>
+    <div class="box" id="vbox"><div id="empty" data-en="Press <kbd>F</kbd> to pick a video (or click one on the left)"><kbd>F</kbd> 를 눌러 영상을 고르세요 (왼쪽에서 눌러도 됩니다)</div><video id="vid" controls playsinline preload="metadata" tabindex="-1" hidden></video><div id="dz" hidden><div id="dzf"></div></div></div>
     <div id="bar" title="누르면 그 자리로"></div>
     <div class="box row">
       <button id="b2" type="button">◀ 2초<kbd>←</kbd></button><button id="pp" type="button">▶ 재생<kbd>Space</kbd></button><button id="f2" type="button">2초 ▶<kbd>→</kbd></button>
       <button id="b01" type="button">◀ 0.1<kbd>⇧←</kbd></button><button id="f01" type="button">0.1 ▶<kbd>⇧→</kbd></button>
       <span id="tm">0:00.0 / 0:00.0</span>
       <button id="spd" type="button">속도 1×<kbd>S</kbd></button>
+      <span id="dzb" class="dzb"></span>
       <button class="popb" type="button" data-pop="v" title="영상을 따로 띄운 창으로 — 다른 모니터로 끌어 옮기고 크게 볼 수 있습니다">⧉ 영상 따로 띄우기<kbd>W</kbd></button>
     </div>
    </div>
@@ -357,6 +386,7 @@ li.it .sent{color:var(--acc2);font-size:12px}
       <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>이 폴더의 이전 · 다음 영상</dd>
       <dt><kbd>⇧F</kbd></dt><dd>폴더 창(Finder·탐색기)으로 고르기</dd>
       <dt><kbd>R</kbd></dt><dd>고친 판 다시 불러오기</dd>
+      <dt><kbd>Z</kbd> · <kbd>⇧Z</kbd></dt><dd data-en="Dead zones (where YouTube · Instagram · TikTok · X cover the video) on · off · <kbd>⇧Z</kbd> next app">데드존(유튜브 · 인스타 · 틱톡 · X 화면에서 글자·단추가 덮는 자리) 보이기 · 숨기기 · <kbd>⇧Z</kbd> 다음 앱으로</dd>
       <dt><kbd>?</kbd></dt><dd>이 창 열기 · 닫기</dd>
     </dl></div>
     <div><h3>화면 배치 (듀얼 모니터)</h3><dl>
@@ -369,6 +399,8 @@ li.it .sent{color:var(--acc2);font-size:12px}
   </div>
 </div></div>
 
+<div class="ov" id="rm" hidden><div class="ebox" id="rmbox"></div></div>
+
 <div class="ov" id="about" hidden><div class="hbox abox" lang="en">
   <h2>Video Feedback <small class="keys">v{{버전}}</small></h2>
   <p>Pause a video, leave notes pinned to the exact moment, then hand them to an AI, a person, or an editing app. Runs only on this computer (Mac or Windows). Videos never leave it.</p>
@@ -377,6 +409,8 @@ li.it .sent{color:var(--acc2);font-size:12px}
   <h3>Make it yours</h3>
   <p>This is a starting point. Ask your AI (Claude Code, Gemini CLI …) to upgrade it to fit the way you work. Give it this folder:</p>
   <pre>{{폴더}}</pre>
+  <div id="upsw" hidden><h3>Update check</h3>
+  <p class="row"><button type="button" data-up="1">On</button><button type="button" data-up="0">Off</button><small class="keys">Once a day it asks GitHub for the latest version number. Nothing about you or your videos is sent.</small></p></div>
   <h3>Language · 언어</h3>
   <p class="row notr" id="langs"><button type="button" data-lang="ko">한국어</button><button type="button" data-lang="en">English</button></p>
   <h3>Version history</h3>
@@ -386,6 +420,8 @@ li.it .sent{color:var(--acc2);font-size:12px}
 <script>
 const Q=new URLSearchParams(location.search),T=Q.get('t')||'';
 const LANG='{{언어}}'==='en'?'en':'ko',KE=(ko,en)=>LANG==='en'?en:ko,LOC=KE('ko-KR','en-US');   // 화면 말(v1.5) — 서버가 채운다 · 짧은 글은 맨 아래 낱말표(EN), 단추·표가 섞인 글은 KE(한국어, 영어)
+const REM=!/^(127\.0\.0\.1|localhost)$/.test(location.hostname),TOUCH=matchMedia('(pointer:coarse)').matches;   // 폰 쪽 주소로 열렸나 · 손가락 화면인가(v1.6)
+document.documentElement.classList.toggle('rem',REM);document.documentElement.classList.toggle('touch',REM||TOUCH);
 const POP={};   // 따로 띄운 창(v1.4.7) — 칸이 그 창으로 옮겨 가도 $ 로 찾게
 const live=w=>!!w&&!w.closed;
 const popFind=id=>{for(const k in POP)if(live(POP[k])){const e=POP[k].document.getElementById(id);if(e)return e}return null};
@@ -422,7 +458,7 @@ async function newest(d){let c;try{c=(await api('/api/newest?p='+encodeURICompon
   if(DIR!==d||!LS||!LS.폴더들.length)return;LS.폴더들.forEach(x=>x.최근=c?c[x.이름]??null:x.최근??null);drawFl()}
 async function ls(p){const wait=setTimeout(()=>$('fl').innerHTML='<p class="keys">폴더를 여는 중…</p>',200);
   try{const j=await api('/api/ls?p='+encodeURIComponent(p));clearTimeout(wait);LS=j;DIR=j.폴더;SORT=j.정렬||SORT;$('sort').value=SORT;keepUrl();$('where').textContent=DIR;$('up').disabled=!j.위;
-    if(!LAYOK){LAYOK=1;if(j.배치&&typeof j.배치==='object')LAY=j.배치;lay()}   // 칸 너비 · 접힘 · 띄운 창 자리는 처음 한 번만 받는다
+    if(!LAYOK){LAYOK=1;if(j.배치&&typeof j.배치==='object')LAY=j.배치;lay();dzDraw()}   // 칸 너비 · 접힘 · 띄운 창 자리는 처음 한 번만 받는다
     const c=NEWC[DIR];if(c)j.폴더들.forEach(x=>x.최근=c[x.이름]);   // 전에 본 폴더는 지난번 때로 먼저 줄 세움
     drawFl();if(j.폴더들.length)newest(DIR);return j}
   catch(e){clearTimeout(wait);$('fl').innerHTML=`<p class="err">${esc(e.message)}</p>`;if(!$('pal').hidden)$('pl').innerHTML=`<li class="pnone err">${esc(e.message)}</li>`}}
@@ -496,7 +532,11 @@ $('find').onclick=palOpen;
 // ── 단축키 · 버전 창 (?)
 const helpToggle=()=>{$('help').hidden=!$('help').hidden;if(!$('help').hidden)awayNote(KE('⌨ 단축키 창','⌨ The shortcut list'))};
 $('hk').onclick=helpToggle;$('help').addEventListener('mousedown',e=>{if(e.target.id==='help')helpToggle()});
-const aboutToggle=()=>{$('about').hidden=!$('about').hidden;$('langs').querySelectorAll('[data-lang]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lang===LANG))};
+const aboutToggle=()=>{$('about').hidden=!$('about').hidden;$('langs').querySelectorAll('[data-lang]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lang===LANG));
+  $('upsw').hidden=UPN==='na';$('upsw').querySelectorAll('[data-up]').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.up==='1')===(UPN==='on'))))};
+let UPN='{{새판알림}}';   // 새 판 알림(v1.6) — 공개판만 on/off · 우리 판은 na(안 보임)
+$('upsw').onclick=e=>{const v=e.target.closest('[data-up]')?.dataset.up;if(!v)return;
+  api('/api/set',{새판알림:v==='1'}).then(j=>{UPN=j.새판알림?'on':'off';if(!j.새판알림)$('nup').hidden=true;aboutToggle();aboutToggle()}).catch(x=>say(x.message,'hmsg'))};
 $('langs').onclick=e=>{const l=e.target.closest('[data-lang]')?.dataset.lang;if(l&&l!==LANG)api('/api/set',{언어:l}).then(()=>location.reload()).catch(x=>say(x.message,'hmsg'))};   // 말 바꾸기 — 서버 글(요청 글 · 내보내기)도 같이 바뀐다
 $('ver').onclick=aboutToggle;$('about').addEventListener('mousedown',e=>{if(e.target.id==='about')aboutToggle()});
 
@@ -507,7 +547,7 @@ async function openV(p){CUR=p;keepUrl();A=B=null;LOCK=null;EDIT=0;GL=false;SEL=0
   try{const j=await api('/api/fb?v='+encodeURIComponent(p));SIG='';take(j);VM=j.vm;showRng()}
   catch(e){say(e.message)}}
 function take(j){if(j.ai)AITXT=j.ai;const s=JSON.stringify(j.data);if(s===SIG)return;SIG=s;FB=j.data;JS=j.json;if(SEL&&!byNo(SEL))SEL=0;PICK.forEach(n=>{if(!byNo(n))PICK.delete(n)});$('file').textContent='저장 파일: '+JS;drawList();drawBar()}
-vid.addEventListener('timeupdate',()=>{tick();nearMark()});vid.addEventListener('seeked',tick);vid.addEventListener('loadedmetadata',()=>{tick();drawBar()});
+vid.addEventListener('timeupdate',()=>{tick();nearMark()});vid.addEventListener('seeked',tick);vid.addEventListener('loadedmetadata',()=>{tick();drawBar();dzDraw()});
 vid.addEventListener('play',()=>{$('pp').innerHTML='❚❚ 멈춤<kbd>Space</kbd>'});vid.addEventListener('pause',()=>{$('pp').innerHTML='▶ 재생<kbd>Space</kbd>'});
 vid.addEventListener('focus',()=>vid.blur());   // 영상 자체 단축키와 겹치지 않게
 function tick(){const t=vid.currentTime;$('tm').textContent=tf(t)+' / '+tf(vid.duration);$('mkt').textContent=tf0(t);
@@ -551,7 +591,7 @@ async function saveMemo(){const g=txt.value.trim();if(!CUR)return say('먼저 �
   try{let j;if(EDIT)j=await api('/api/op',{v:CUR,op:'edit',번호:EDIT,글:g});
     else if(GL)j=await api('/api/op',{v:CUR,op:'add',전체:true,분류:CAT,글:g,길이:vid.duration||0});
     else{lock();j=await api('/api/op',{v:CUR,op:'add',시작:LOCK.s,끝:LOCK.e,글:g,길이:vid.duration||0})}
-    const was=EDIT,wg=GL;take({data:j.data,json:JS,ai:j.ai});cancelMemo();A=B=null;showRng();txt.blur();say(was?`${was}번을 고쳤습니다`:wg?'영상 전체 메모를 남겼습니다':'남겼습니다 — Space 로 이어 보기')}
+    const was=EDIT,wg=GL;take({data:j.data,json:JS,ai:j.ai});cancelMemo();A=B=null;showRng();txt.blur();say(was?`${was}번을 고쳤습니다`:wg?'영상 전체 메모를 남겼습니다':TOUCH||REM?'남겼습니다':'남겼습니다 — Space 로 이어 보기')}
   catch(e){say('못 남겼습니다: '+e.message)}}
 $('save').onclick=saveMemo;$('cancel').onclick=cancelMemo;
 function onEnter(e,fn){   // 메모 칸 Enter = 남기기 · 한글 조합 중 Enter: 크롬은 확정용 Enter 뒤에 한 번 더 보내고, 사파리는 안 보낸다 → 잠깐 기다렸다 한 번만
@@ -601,8 +641,11 @@ function eShow(step){$('e1').hidden=step!==1;$('e2').hidden=step!==2}
 function eOut(html,bad){const o=$('eout');o.hidden=!html;o.classList.toggle('bad',!!bad);o.innerHTML=html||''}
 function expOpen(){if(!CUR)return say('먼저 영상을 고르세요','cmsg');if(!M().length)return say('메모가 없습니다','cmsg');$('exp').hidden=false;eShow(1);eOut('');awayNote(KE('📤 내보내기 창','📤 The export menu'))}
 const expClose=()=>{$('exp').hidden=true};
-async function copyAI(){if(!CUR)return say('먼저 영상을 고르세요','cmsg');if(!M().length)return say('메모가 없습니다','cmsg');const t=AITXT;let ok=true;
-  try{await navigator.clipboard.writeText(t)}catch(e){ok=false}
+async function copyT(t){try{await navigator.clipboard.writeText(t);return true}catch(e){}   // 폰 주소(http)는 보안 연결이 아니라 clipboard 가 없다 → 옛 방식
+  const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.cssText='position:fixed;left:0;top:0;opacity:0';document.body.append(a);
+  a.select();a.setSelectionRange(0,t.length);let ok=false;try{ok=document.execCommand('copy')}catch(e){}a.remove();return ok}
+async function copyAI(){if(!CUR)return say('먼저 영상을 고르세요','cmsg');if(!M().length)return say('메모가 없습니다','cmsg');const t=AITXT;
+  const ok=await copyT(t);
   const how=KE(`<b>${ok?'📋 복사했습니다.':'⚠ 복사가 막혔습니다 — 아래 글을 직접 복사하세요.'}</b> 쓰시는 AI 창(클로드 코드 · 제미나이 CLI 등)에 <b>붙여 넣기(${PASTE})</b> 하세요.<small class="keys">채팅만 되는 AI(제미나이 앱 등)는 폴더를 못 열어서 직접 고치지는 못하고 조언만 합니다.</small>`,
     `<b>${ok?'📋 Copied.':'⚠ Copying was blocked — copy the text below yourself.'}</b> <b>Paste it (${PASTE})</b> into your AI window (Claude Code, Gemini CLI …).<small class="keys">Chat-only AIs (like the Gemini app) can't open your folders, so they can only give advice, not make the changes.</small>`)+`<pre>${esc(t)}</pre>`;
   if($('exp').hidden){$('exp').hidden=false;eShow(0)}eOut(how,!ok)}
@@ -751,7 +794,42 @@ function lay(){const nl=!!LAY.nl||popped('f'),nr=!!LAY.nr||popped('l');   // 띄
   $('pops').innerHTML=Object.keys(MODS).filter(popped).map(k=>`<button type="button" data-back="${k}" title="띄운 창을 닫고 제자리로">↩ ${MODS[k][1]}</button>`).join('')}
 $('pops').onclick=e=>{const k=e.target.closest('[data-back]')?.dataset.back;if(k)popBack(k)};
 function saveLay(){clearTimeout(LAYT);LAYT=setTimeout(()=>api('/api/set',{배치:LAY}).catch(()=>{}),500)}
-function layReset(){Object.keys(MODS).forEach(k=>popBack(k));LAY={w:LAY.w};lay();saveLay();say('칸을 모두 제자리 · 처음 너비로 돌렸습니다','hmsg')}   // 띄운 창 자리는 기억해 둔다
+function layReset(){Object.keys(MODS).forEach(k=>popBack(k));LAY={w:LAY.w,dz:LAY.dz,dzh:LAY.dzh};lay();saveLay();say('칸을 모두 제자리 · 처음 너비로 돌렸습니다','hmsg')}   // 띄운 창 자리 · 데드존은 기억해 둔다
+// ── 데드존(v1.5.1) — 숫자는 1080×1920 기준 [x, y, 너비, 높이, 이름표, 세로글씨]. 앱이 공개한 건 광고 안내뿐이라 그 숫자를 쓴다(폰·앱 판·설명 길이에 따라 조금씩 다름)
+//    · 고른 앱은 «배치»(LAY.dz · 숨김 LAY.dzh)에 남는다 · Z 보이기·숨기기 · ⇧Z 다음 앱 하나만 · 단추는 앱마다 켜고 끄기(여럿 겹쳐 보기 가능)
+const DZ={
+  yt:{n:KE('유튜브','YouTube'),c:'255,40,60',safe:[48,288,840,960],
+    note:KE('유튜브 쇼츠 — 구글 세로 광고 안내의 숫자(위 288 · 아래 672 · 오른쪽 192 · 왼쪽 48px)','YouTube Shorts — numbers from Google’s vertical video ads guide (top 288 · bottom 672 · right 192 · left 48 px)'),
+    r:[[0,0,1080,288,KE('위 아이콘','Top icons')],[0,1248,1080,672,KE('제목 · 채널 · 구독','Title · channel · subscribe')],[888,288,192,960,KE('좋아요 · 댓글 · 공유','Like · comment · share'),1],[0,288,48,960]]},
+  ig:{n:KE('인스타','Instagram'),c:'214,41,118',safe:[65,269,950,979],
+    note:KE('인스타 릴스 — 메타 광고 안내의 비율(위 14% · 아래 35% · 양옆 6%)','Instagram Reels — Meta ads guide (top 14% · bottom 35% · sides 6%)'),
+    r:[[0,0,1080,269,KE('위 메뉴','Top menu')],[0,1248,1080,672,KE('아이디 · 설명 · 단추','Name · caption · buttons')],[0,269,65,979],[1015,269,65,979]]},
+  tt:{n:KE('틱톡','TikTok'),c:'0,190,205',safe:[120,240,840,1020],
+    note:KE('틱톡 — 틱톡 광고 안전 구역 틀(위 240 · 아래 660 · 양옆 120px · 오른쪽 단추 줄 180px)','TikTok — TikTok ads safe-zone template (top 240 · bottom 660 · sides 120 px · right button column 180 px)'),
+    r:[[0,0,1080,240,KE('팔로잉 · 추천 탭','Following · For You tabs')],[0,1260,1080,660,KE('아이디 · 설명 · 음악','Name · caption · sound')],[900,840,180,420,KE('좋아요 등','Buttons'),1],[0,240,120,1020],[960,240,120,600]]},
+  x:{n:'X',c:'140,140,155',safe:[80,80,920,1390],
+    note:KE('X — 공식 숫자가 없어 참고값(위 80 · 아래 450 · 양옆 80px)','X — no official numbers, rough guide (top 80 · bottom 450 · sides 80 px)'),
+    r:[[0,0,1080,80],[0,1470,1080,450,KE('글 · 아이디 · 단추','Post text · name · buttons')],[0,80,80,1390],[1000,80,80,1390]]}};
+const dzOn=()=>(Array.isArray(LAY.dz)?LAY.dz:[]).filter(k=>DZ[k]);
+$('dzb').innerHTML=`<b>${KE('데드존','Dead zones')}<kbd>Z</kbd></b>`+Object.entries(DZ).map(([k,d])=>`<button type="button" data-dz="${k}" style="--c:${d.c}" title="${esc(d.note+KE(' · 폰 · 앱 판 · 설명 길이에 따라 조금씩 다릅니다',' · varies a little with the phone, app version and caption length'))}">${esc(d.n)}</button>`).join('');
+$('dzb').onclick=e=>{const k=e.target.closest('[data-dz]')?.dataset.dz;if(!k)return;const on=dzOn();
+  if(LAY.dzh){LAY.dzh=false;if(!on.includes(k))on.push(k)}else if(on.includes(k))on.splice(on.indexOf(k),1);else on.push(k);
+  LAY.dz=on;dzDraw();saveLay()};
+function dzKey(next){const ks=Object.keys(DZ),on=dzOn();
+  if(next){LAY.dz=[ks[(ks.indexOf(on.length===1&&!LAY.dzh?on[0]:ks[ks.length-1])+1)%ks.length]];LAY.dzh=false}   // ⇧Z: 다음 앱 하나만
+  else if(!on.length){LAY.dz=['yt'];LAY.dzh=false}else LAY.dzh=!LAY.dzh;
+  dzDraw();saveLay();const s=dzOn();say(LAY.dzh||!s.length?KE('데드존 숨김','Dead zones hidden'):KE('데드존: ','Dead zones: ')+s.map(k=>DZ[k].n).join(' · '),'hmsg')}
+function dzDraw(){const on=dzOn(),show=on.length>0&&!LAY.dzh,z=$('dz'),f=$('dzf');
+  $('dzb').querySelectorAll('[data-dz]').forEach(b=>b.setAttribute('aria-pressed',String(show&&on.includes(b.dataset.dz))));
+  z.hidden=!show||vid.hidden;if(z.hidden)return;
+  const vw=vid.videoWidth,vh=vid.videoHeight,ar=vw&&vh?vw/vh:9/16,P=(v,t)=>(v/t*100).toFixed(3)+'%',
+    box=(x,y,w,h)=>`left:${P(x,1080)};top:${P(y,1920)};width:${P(w,1080)};height:${P(h,1920)}`;
+  z.style.setProperty('--ar',ar);f.classList.toggle('many',on.length>1);
+  const warn=t=>`<div class="dzw">${t}</div>`;
+  if(ar>.6){f.innerHTML=warn(KE(`데드존은 세로(9:16) 영상용입니다 — 이 영상은 ${vw}×${vh}`,`Dead zones are for vertical (9:16) videos — this one is ${vw}×${vh}`));return}   // 가로 · 네모 영상엔 안 맞아서 안 그림
+  f.innerHTML=on.map(k=>{const d=DZ[k];
+    return d.r.map(([x,y,w,h,t,v])=>`<div class="dzr${v?' v':''}" style="--c:${d.c};${box(x,y,w,h)}">${t?`<span>${esc(t)}</span>`:''}</div>`).join('')+`<div class="dzs" style="--c:${d.c};${box(...d.safe)}"></div>`}).join('')+
+    (vw&&Math.abs(ar-9/16)>.03?warn(KE(`9:16 기준이라 조금 다릅니다 — 이 영상은 ${vw}×${vh}`,`Made for 9:16, so a little off — this video is ${vw}×${vh}`)):'')}
 function spDown(e){if(e.button)return;const sp=e.currentTarget,L=sp.dataset.s==='l',k=L?'f':'l',x0=e.clientX;let moved=false;
   sp.setPointerCapture(e.pointerId);e.preventDefault();
   const mv=ev=>{if(popped(k)||!moved&&Math.abs(ev.clientX-x0)<4)return;moved=true;sp.classList.add('drag');
@@ -839,6 +917,7 @@ function onKey(e){LW=e.view||window;
   if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.metaKey||e.ctrlKey||e.isComposing)return;
   const c=e.code,s=e.shiftKey,run=f=>{e.preventDefault();f()};
   if(!$('about').hidden){if(c==='Escape')run(aboutToggle);return}
+  if(!$('rm').hidden){if(c==='Escape')run(rmClose);return}
   if(!$('mw').hidden){if(c==='Escape')run(mwClose);return}
   if(!$('ho').hidden){const n=+(/^Digit([1-9])$/.exec(c)?.[1]||0),ent=c==='Enter'||c==='NumpadEnter',ud=c==='ArrowDown'?1:c==='ArrowUp'?-1:0;
     if(c==='Escape')return run(hoClose);
@@ -869,7 +948,8 @@ function onKey(e){LW=e.view||window;
   if(c==='Enter'&&s)return run(hoOpen);   // ✅ 피드백 완료 — 지금 영상이 없어도 된다(여러 편을 한꺼번에)
   if(c==='KeyG'&&s)return run(multiKey);   // 여러 영상 고르기 → 한 번 더 = 고른 영상에 전체 메모
   if(c==='Escape'&&MULTI)return run(()=>multiOn(false));
-  if(c==='KeyW')return run(()=>s?layReset():popped('v')?popBack('v'):popOut('v'));   // ⧉ 영상 따로 띄우기 · ⇧W 모두 제자리로
+  if(c==='KeyW')return run(()=>s?layReset():popped('v')?popBack('v'):popOut('v'));
+  if(c==='KeyZ')return run(()=>dzKey(s));   // 데드존 보이기·숨기기 · ⇧Z 다음 앱   // ⧉ 영상 따로 띄우기 · ⇧W 모두 제자리로
   if(!CUR)return;
   const K={Space:togglePlay,KeyK:togglePlay,ArrowLeft:()=>s?nudge(-.1):seekBy(-2),ArrowRight:()=>s?nudge(.1):seekBy(2),
     KeyJ:()=>seekBy(-10),KeyL:()=>seekBy(10),Comma:()=>nudge(-FPS),Period:()=>nudge(FPS),Digit0:()=>seek(0),Home:()=>seek(0),End:()=>seek(vid.duration),
@@ -881,7 +961,76 @@ function onKey(e){LW=e.view||window;
 // 클로드가 반영 표시를 하거나 영상을 새로 만들면 4초 안에 보인다(페이지나 띄운 창 하나라도 보일 때만)
 setInterval(async()=>{if(!CUR||document.hidden&&!Object.values(POP).some(w=>live(w)&&!w.document.hidden))return;try{const j=await api('/api/fb?v='+encodeURIComponent(CUR));take(j);if(j.vm!==VM)$('newv').hidden=false}catch(e){}},4000);
 const PV='{{버전}}';   // 새 판이 오면 서버가 스스로 다시 켜지고, 여기엔 «새로고침» 단추가 뜬다
-setInterval(()=>api('/api/ping').then(j=>{if(j.v&&j.v!==PV){const u=$('upd');u.hidden=false;u.textContent=`🔄 새 판 v${j.v} — 눌러서 새로고침`}}).catch(()=>say('페이지가 꺼졌습니다 — 영상피드백을 다시 여세요')),60000);
+function pingDo(j){if(j.v&&j.v!==PV){const u=$('upd');u.hidden=false;u.textContent=`🔄 새 판 v${j.v} — 눌러서 새로고침`}
+  if(!REM){RM=j.원격;rmBtn()}
+  const n=$('nup');n.hidden=!j.새판;if(j.새판)n.textContent=KE(`🆕 새 판 v${j.새판} — 업데이트 문장 복사`,`🆕 v${j.새판} is out — copy the update request`)}
+const ping=()=>api('/api/ping').then(pingDo);
+setInterval(()=>ping().catch(()=>say('페이지가 꺼졌습니다 — 영상피드백을 다시 여세요')),60000);
+ping().catch(()=>{});
+$('nup').onclick=async()=>{const t=KE('https://github.com/BB-1919/video-feedback 에서 영상 피드백을 최신 판으로 업데이트해 줘. 화면 말은 한국어로. 내 메모와 설정은 그대로 둬.',
+  'Update Video Feedback to the latest version from https://github.com/BB-1919/video-feedback. Keep my notes and settings.');
+  say(await copyT(t)?KE('📋 복사했습니다 — 쓰시는 AI 창(클로드 코드 등)에 붙여 넣으세요','📋 Copied — paste it into your AI window (Claude Code, etc.)'):t,'hmsg')};
+// ── 폰·태블릿(v1.6) — 같은 와이파이의 폰이 QR 코드로 이 페이지를 연다. 서버는 그때만 와이파이 쪽 문을 열고(출입표는 켤 때마다 새로), 폰에서 30분 안 쓰면 닫는다
+let RM=null;
+function rmBtn(){const b=$('rmb'),on=!!(RM&&RM.켜짐);b.textContent=on?KE('📱 폰 연결 켜짐','📱 Phone connected'):KE('📱 폰 · 태블릿','📱 Phone · tablet');b.classList.toggle('on',on);
+  b.title=KE('같은 와이파이의 폰·태블릿에서 이 페이지를 엽니다 (QR 코드)','Open this page on a phone or tablet on the same Wi-Fi (QR code)')}
+async function rmOpen(){$('rm').hidden=false;rmDraw(KE('연결하는 중…','Connecting…'));
+  try{RM=await api('/api/remote',{켜기:true});rmBtn();rmDraw()}catch(e){rmDraw('',e.message)}}
+const rmClose=()=>{$('rm').hidden=true};
+async function rmOff(){try{RM=await api('/api/remote',{켜기:false})}catch(e){RM=null}rmBtn();rmClose();say(KE('폰 연결을 껐습니다','Phone connection turned off'),'hmsg')}
+function rmDraw(wait,err){
+  const head=`<h2>${KE('📱 폰 · 태블릿에서 보기','📱 Use it on a phone or tablet')} <small class="keys">— <kbd>Esc</kbd> ${KE('닫기','close')}</small></h2>`;
+  if(wait||err||!RM||!RM.켜짐){$('rmbox').innerHTML=head+(err?`<p class="err">⚠ ${esc(err)}</p><div class="row"><button id="rmx" type="button" class="main">${KE('닫기','Close')}</button></div>`:`<p>${esc(wait||'')}</p>`);return}
+  $('rmbox').innerHTML=head+`<div class="rmg"><div class="qr">${qrSvg(RM.url)}</div><ol class="rms">${KE(
+    '<li>폰(태블릿)을 이 컴퓨터와 <b>같은 와이파이</b>에 연결합니다</li><li>폰 카메라로 QR 코드를 찍고, 뜨는 주소를 누릅니다</li><li>메모는 이 컴퓨터의 영상 옆에 그대로 저장됩니다 — 피드백 완료 → AI 도 폰에서 됩니다</li>',
+    '<li>Connect the phone or tablet to the <b>same Wi-Fi</b> as this computer</li><li>Point the phone camera at the QR code and tap the link</li><li>Notes are saved next to the video on this computer — “Done → AI” works from the phone too</li>')}</ol></div>
+  <p class="keys">${KE('이 창을 닫아도 연결은 켜져 있고, 폰에서 30분 안 쓰면 저절로 꺼집니다. 이 컴퓨터가 «들어오는 연결을 허용할까요?» 하고 물으면 «허용»을 누르세요. 주소에 출입표가 들어 있으니 다른 사람에게 보내지 마세요.',
+    'Closing this box keeps the connection on; it turns itself off after 30 minutes without use on the phone. If this computer asks whether to allow incoming connections, choose Allow. The link contains an access key, so don’t send it to anyone.')}</p>
+  <details><summary>${KE('QR 코드가 안 되면 — 폰 브라우저 주소창에 직접','If the QR code doesn’t work — type this into the phone’s browser')}</summary><p class="rmu notr">${esc(RM.url)}</p></details>
+  <div class="row"><button id="rmoff" type="button">${KE('🔌 연결 끄기','🔌 Turn off')}</button><button id="rmx" type="button" class="main">${KE('닫기','Close')}</button></div>`}
+$('rmb').onclick=()=>RM&&RM.켜짐?($('rm').hidden=false,rmDraw()):rmOpen();
+$('rm').addEventListener('click',e=>{const id=e.target.closest('button')?.id;if(id==='rmoff')rmOff();else if(id==='rmx'||e.target.id==='rm')rmClose()});
+if(!REM){$('rmb').hidden=false;rmBtn()}
+// QR 코드 — 바깥 라이브러리 없이 표준(ISO/IEC 18004) 그대로: 바이트 모드 · 오류 정정 M · 1~10판(213바이트까지) · 마스크는 벌점(N1 · N2 · N4)이 가장 작은 것
+function qrSvg(text){
+  const data=[...new TextEncoder().encode(text)];
+  const EC=[0,[10,1,16,0,0],[16,1,28,0,0],[26,1,44,0,0],[18,2,32,0,0],[24,2,43,0,0],[16,4,27,0,0],[18,4,31,0,0],[22,2,38,2,39],[22,3,36,2,37],[26,4,43,1,44]];
+  const AL=[0,[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50]];
+  let ver=0;for(let v=1;v<=10&&!ver;v++){const e=EC[v];if(4+(v<10?8:16)+data.length*8<=(e[1]*e[2]+e[3]*e[4])*8)ver=v}
+  if(!ver)return '';
+  const [ecn,n1,k1,n2,k2]=EC[ver],cap=n1*k1+n2*k2,size=17+4*ver,bits=[],put=(v,n)=>{for(let i=n-1;i>=0;i--)bits.push(v>>>i&1)};
+  put(4,4);put(data.length,ver<10?8:16);data.forEach(b=>put(b,8));put(0,Math.min(4,cap*8-bits.length));while(bits.length%8)bits.push(0);
+  for(let p=0xEC;bits.length<cap*8;p^=0xEC^0x11)put(p,8);
+  const cw=[];for(let i=0;i<bits.length;i+=8)cw.push(bits.slice(i,i+8).reduce((a,b)=>a<<1|b,0));
+  const EXP=[],LG=[];for(let i=0,x=1;i<255;i++){EXP[i]=x;LG[x]=i;x<<=1;if(x&256)x^=0x11D}for(let i=255;i<512;i++)EXP[i]=EXP[i-255];
+  const mul=(a,b)=>a&&b?EXP[LG[a]+LG[b]]:0;
+  let gen=[1];for(let i=0;i<ecn;i++){const g=new Array(gen.length+1).fill(0);gen.forEach((c,j)=>{g[j]^=c;g[j+1]^=mul(c,EXP[i])});gen=g}
+  const rs=d=>{const r=new Array(ecn).fill(0);for(const b of d){const f=b^r.shift();r.push(0);for(let j=0;j<ecn;j++)r[j]^=mul(gen[j+1],f)}return r};
+  const blocks=[];for(let i=0,o=0;i<n1+n2;i++){const k=i<n1?k1:k2,d=cw.slice(o,o+k);o+=k;blocks.push([d,rs(d)])}
+  const all=[];for(let i=0;i<Math.max(k1,k2);i++)blocks.forEach(([d])=>{if(i<d.length)all.push(d[i])});for(let i=0;i<ecn;i++)blocks.forEach(([,e])=>all.push(e[i]));
+  const M=[...Array(size)].map(()=>new Array(size).fill(0)),F=[...Array(size)].map(()=>new Array(size).fill(false)),set=(x,y,v)=>{M[y][x]=v?1:0;F[y][x]=true};
+  for(let i=0;i<size;i++){set(6,i,i%2===0);set(i,6,i%2===0)}
+  for(const [cx,cy] of [[3,3],[size-4,3],[3,size-4]])for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){const x=cx+dx,y=cy+dy,d=Math.max(Math.abs(dx),Math.abs(dy));if(x>=0&&x<size&&y>=0&&y<size)set(x,y,d!==2&&d!==4)}
+  const al=AL[ver],last=al.length-1;
+  al.forEach((a,i)=>al.forEach((b,j)=>{if(i===0&&j===0||i===0&&j===last||i===last&&j===0)return;for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)set(a+dx,b+dy,Math.max(Math.abs(dx),Math.abs(dy))!==1)}));
+  const fmt=mask=>{let r=mask;for(let i=0;i<10;i++)r=r<<1^(r>>>9)*0x537;const b=(mask<<10|r)^0x5412,g=i=>b>>>i&1;   // 오류 정정 M = 00
+    for(let i=0;i<=5;i++)set(8,i,g(i));set(8,7,g(6));set(8,8,g(7));set(7,8,g(8));for(let i=9;i<15;i++)set(14-i,8,g(i));
+    for(let i=0;i<8;i++)set(size-1-i,8,g(i));for(let i=8;i<15;i++)set(8,size-15+i,g(i));set(8,size-8,1)};
+  fmt(0);
+  if(ver>=7){let r=ver;for(let i=0;i<12;i++)r=r<<1^(r>>>11)*0x1F25;const b=ver<<12|r;for(let i=0;i<18;i++){const v=b>>>i&1,a=size-11+i%3,c=Math.floor(i/3);set(a,c,v);set(c,a,v)}}
+  for(let right=size-1,i=0,nb=all.length*8;right>=1;right-=2){if(right===6)right=5;
+    for(let vert=0;vert<size;vert++)for(let j=0;j<2;j++){const x=right-j,y=(right+1&2)===0?size-1-vert:vert;if(!F[y][x]&&i<nb){M[y][x]=all[i>>>3]>>>(7-(i&7))&1;i++}}}
+  const MF=[(x,y)=>(x+y)%2===0,(x,y)=>y%2===0,(x,y)=>x%3===0,(x,y)=>(x+y)%3===0,(x,y)=>(Math.floor(x/3)+Math.floor(y/2))%2===0,
+    (x,y)=>x*y%2+x*y%3===0,(x,y)=>(x*y%2+x*y%3)%2===0,(x,y)=>((x+y)%2+x*y%3)%2===0];
+  const flip=m=>{for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(!F[y][x]&&MF[m](x,y))M[y][x]^=1};
+  const pen=()=>{let p=0,dark=0;
+    for(let k=0;k<2;k++)for(let a=0;a<size;a++){let run=1;for(let b=1;b<=size;b++){const c=b<size?(k?M[b][a]:M[a][b]):-1,pv=k?M[b-1][a]:M[a][b-1];if(c===pv)run++;else{if(run>=5)p+=run-2;run=1}}}
+    for(let y=0;y<size-1;y++)for(let x=0;x<size-1;x++){const c=M[y][x];if(c===M[y][x+1]&&c===M[y+1][x]&&c===M[y+1][x+1])p+=3}
+    M.forEach(r=>r.forEach(c=>dark+=c));return p+(Math.ceil(Math.abs(dark*20-size*size*10)/(size*size))-1)*10};
+  let best=0,bp=Infinity;for(let m=0;m<8;m++){flip(m);fmt(m);const p=pen();if(p<bp){bp=p;best=m}flip(m)}
+  flip(best);fmt(best);
+  const q=4,n=size+2*q;let d='';for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(M[y][x])d+=`M${x+q} ${y+q}h1v1h-1z`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" role="img" aria-label="QR"><rect width="${n}" height="${n}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`}
 $('upd').onclick=()=>location.reload();   // 탭이 열려 있는 동안은 안 꺼지게
 
 //    · EN: 글 전체가 같으면 · ENX: 숫자·이름이 섞인 글 · data-en: 단추·표가 섞인 칸은 통째로 · KE(): 코드가 만드는 긴 글
@@ -938,7 +1087,7 @@ const EN={
 '이 폴더에는 영상이 없습니다':'No videos in this folder','폴더를 여는 중…':'Opening the folder…','열린 폴더 창에서 폴더를 고르세요':'Choose a folder in the window that opened',
 '이 폴더의 마지막 영상입니다':'That was the last video in this folder','이 폴더의 첫 영상입니다':'This is the first video in this folder','이 폴더 고르기 풀기':'Unpick this folder',
 '왼쪽에서 영상을 고르세요':'Pick videos on the left','먼저 왼쪽에서 영상을 고르세요':'Pick videos on the left first','메모를 적어 주세요':'Write a note first','남기는 중…':'Saving…',
-'맞는 것이 없습니다':'Nothing matches','먼저 영상을 고르세요':'Pick a video first','영상 전체 메모를 남겼습니다':'Whole-video note saved','남겼습니다 — Space 로 이어 보기':'Saved — Space to keep watching',
+'맞는 것이 없습니다':'Nothing matches','먼저 영상을 고르세요':'Pick a video first','영상 전체 메모를 남겼습니다':'Whole-video note saved','남겼습니다':'Saved','남겼습니다 — Space 로 이어 보기':'Saved — Space to keep watching',
 '영상 전체에 메모':'Note on the whole video','— 색감·LUT · 화질 · 프레임처럼 영상 전체에 대한 것 (갈래는 골라도 되고 안 골라도 됩니다)':'— about the whole video, like color/LUT, quality or frame rate (a category is optional)',
 '취소)':'to cancel)','영상 전체':'Whole video','🌐 영상 전체':'🌐 Whole video','✓ 완료됨':'✓ Done','완료 표시':'Mark done','고치기':'Edit','정말 지우기':'Really delete','지우기':'Delete',
 'D 두 번':'D twice','지울 것으로 고르기 (V)':'Pick for deleting (V)','D 를 한 번 더 누르면 지웁니다 (3초)':'Press D once more to delete (3 s)','메모가 아직 없습니다':'No notes yet',

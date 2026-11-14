@@ -21,7 +21,7 @@ WIN = os.name == 'nt'
 if not WIN:
     import fcntl
 
-VERSION = '1.5.0'
+VERSION = '1.6.0'
 MAKER = 'BB'
 LANG0 = 'en'
 LANG = LANG0
@@ -31,7 +31,10 @@ def L(ko, en):
     return en if LANG == 'en' else ko
 
 
-CHANGES = [('1.5.0', '2026-11-08', 'English version: every screen, message, export and the picture guide in English or Korean. '
+CHANGES = [('1.6.0', '2026-11-15', 'Phone and tablet: press 📱 at the top and scan the QR code with a phone on the same Wi-Fi to watch and leave notes there. '
+            'Dead zones: press Z (or the buttons under the video) to see where YouTube Shorts, Instagram Reels, TikTok and X cover a vertical video '
+            'with their buttons and text (Shift+Z for the next app). Once a day it checks GitHub for a newer version (turn it off in this panel).'),
+           ('1.5.0', '2026-11-08', 'English version: every screen, message, export and the picture guide in English or Korean. '
             'Switch language in this panel (ⓘ). Runs on the Python 3.9 that comes with macOS.'),
            ('1.4.7', '2026-11-07', 'Drag the lines between panels to resize them (push all the way to fold a side panel). '
             'Pop the video out into its own window (W) and drag it to a second monitor; the other panels can pop out too (⧉). '
@@ -77,6 +80,11 @@ VEXT = ('.mp4', '.mov', '.m4v', '.webm')
 TOKEN = ''
 PORT = 0
 LAST = time.time()
+REMOTE = {}
+RLOCK = threading.Lock()
+REMOTE_NO = ('/api/pick', '/api/quit', '/api/remote')
+CHECK_UPDATES = True
+UPDATE_REPO = 'BB-1919/video-feedback'
 
 
 def now():
@@ -786,14 +794,29 @@ class H(BaseHTTPRequestHandler):
     def _gate(self):
         global LAST
         LAST = time.time()
-        if self.headers.get('Host', '') not in (f'127.0.0.1:{PORT}', f'localhost:{PORT}'):
+        R = dict(REMOTE)
+        self.rem = rem = bool(R) and self.server is R['srv']
+        if rem:
+            if self.headers.get('Host', '') != f"{R['ip']}:{R['port']}" or not private_ip(self.client_address[0]):
+                self._send(403, {'오류': L('같은 와이파이 안에서만 엽니다', 'This only opens on the same Wi-Fi')})
+                return None
+        elif self.headers.get('Host', '') not in (f'127.0.0.1:{PORT}', f'localhost:{PORT}'):
             self._send(403, {'오류': L('이 컴퓨터 안에서만 엽니다', 'This page only opens on this computer')})
             return None
         u = urllib.parse.urlparse(self.path)
         q = dict(urllib.parse.parse_qsl(u.query))
-        if q.get('t') != TOKEN:
+        if q.get('t') != (R['token'] if rem else TOKEN):
+            if rem and 't' in q:
+                R['srv'].bad = getattr(R['srv'], 'bad', 0) + 1
+                if R['srv'].bad >= 3:
+                    threading.Thread(target=remote_off, daemon=True).start()
             self._send(403, {'오류': L('출입표가 맞지 않습니다 — 영상피드백을 다시 여세요', 'The access key does not match — open Video Feedback again')})
             return None
+        if rem:
+            R['srv'].last = time.time()
+            if u.path in REMOTE_NO:
+                self._send(403, {'오류': L('폰·태블릿에서는 못 쓰는 기능입니다', 'Not available on a phone or tablet')})
+                return None
         return u.path, q
 
     def do_GET(self):
@@ -807,10 +830,11 @@ class H(BaseHTTPRequestHandler):
                     page = f.read()
                 ch = ''.join(f'<li><b>v{a}</b> <small>{b}</small> — {_xml(c)}</li>' for a, b, c in CHANGES)
                 page = (page.replace('{{버전}}', VERSION).replace('{{만든이}}', MAKER).replace('{{언어}}', LANG)
-                        .replace('{{바뀐것}}', ch).replace('{{폴더}}', _xml(HERE)))
+                        .replace('{{바뀐것}}', ch).replace('{{폴더}}', _xml(HERE))
+                        .replace('{{새판알림}}', ('off' if load_json(SETF).get('새판알림') is False else 'on') if CHECK_UPDATES else 'na'))
                 return self._send(200, page.encode(), 'text/html; charset=utf-8')
             if path == '/api/ping':
-                return self._send(200, {'ok': 1, 'v': VERSION})
+                return self._send(200, {'ok': 1, 'v': VERSION, '원격': remote_info(), '새판': None if self.rem else update_info()})
             if path == '/api/ls':
                 p = q.get('p') or default_dir()
                 if not allowed(p) or not os.path.isdir(p):
@@ -890,7 +914,7 @@ class H(BaseHTTPRequestHandler):
                     d = apply(v, body)
                     ai = request_text([(v, fb_path(v), sum(not m.get('반영') for m in d['메모']))])
                     return self._send(200, {'data': d, 'ai': ai})
-                show = body.get('보여주기', True) is not False
+                show = body.get('보여주기', True) is not False and not self.rem
                 if path == '/api/export':
                     if body.get('kind') not in EXPORTERS:
                         return self._send(400, {'오류': L('모르는 프로그램', 'Unknown app')})
@@ -922,6 +946,12 @@ class H(BaseHTTPRequestHandler):
                         s['배치'] = lay
                         write_json(SETF, s)
                     return self._send(200, {'배치': True})
+                if '새판알림' in body:
+                    with Lock():
+                        s = load_json(SETF)
+                        s['새판알림'] = bool(body['새판알림'])
+                        write_json(SETF, s)
+                    return self._send(200, {'새판알림': s['새판알림']})
                 if '정렬' in body:
                     if body['정렬'] not in ('최근', '이름', '오래된'):
                         return self._send(400, {'오류': L('모르는 정렬입니다', 'Unknown sort order')})
@@ -940,6 +970,11 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {'새창': cmd})
             if path == '/api/pick':
                 return self._send(200, {'폴더': pick_folder()})
+            if path == '/api/remote':
+                if body.get('켜기'):
+                    return self._send(200, remote_on())
+                remote_off()
+                return self._send(200, remote_info())
             if path == '/api/quit':
                 self._send(200, {'ok': 1})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
@@ -1020,6 +1055,93 @@ def token():
     return t
 
 
+def private_ip(ip):
+    import ipaddress
+    try:
+        a = ipaddress.ip_address(ip.split('%')[0])
+    except ValueError:
+        return False
+    if getattr(a, 'ipv4_mapped', None):
+        a = a.ipv4_mapped
+    return a.version == 4 and a.is_private and not a.is_loopback and not a.is_link_local
+
+
+def lan_ip():
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('10.254.254.254', 1))
+        ip = s.getsockname()[0]
+    except OSError:
+        return ''
+    finally:
+        s.close()
+    return ip if private_ip(ip) else ''
+
+
+def remote_info():
+    R = dict(REMOTE)
+    if not R:
+        return {'켜짐': False}
+    return {'켜짐': True, 'ip': R['ip'], 'port': R['port'], 'url': f"http://{R['ip']}:{R['port']}/?t={R['token']}"}
+
+
+def remote_on():
+    with RLOCK:
+        if REMOTE:
+            return remote_info()
+        ip = lan_ip()
+        if not ip:
+            raise ValueError(L('와이파이(공유기)에 연결돼 있지 않습니다 — 폰과 같은 와이파이에 연결한 뒤 다시 누르세요',
+                               'This computer is not on a home or office Wi-Fi — join the same Wi-Fi as your phone, then try again'))
+        srv = None
+        for p in (PORT, PORT + 10, PORT + 20):
+            try:
+                srv = ThreadingHTTPServer((ip, p), H)
+                break
+            except OSError:
+                continue
+        if not srv:
+            raise ValueError(L('폰 연결에 쓸 포트가 모두 쓰이는 중입니다', 'No free port for the phone connection'))
+        srv.last, srv.bad = time.time(), 0
+        REMOTE.update(srv=srv, ip=ip, port=p, token=secrets.token_urlsafe(12))
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        return remote_info()
+
+
+def remote_off():
+    with RLOCK:
+        srv = REMOTE.get('srv')
+        REMOTE.clear()
+    if srv:
+        srv.shutdown()
+        srv.server_close()
+
+
+def update_info():
+    if not CHECK_UPDATES:
+        return None
+    s = load_json(SETF)
+    if s.get('새판알림') is False:
+        return None
+    c = s.get('새판확인') or {}
+    if time.time() - c.get('때', 0) > 86400:
+        try:
+            req = urllib.request.Request(f'https://api.github.com/repos/{UPDATE_REPO}/releases/latest',
+                                         headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'video-feedback'})
+            with urllib.request.urlopen(req, timeout=4) as r:
+                c = {'때': time.time(), '판': str(json.loads(r.read()).get('tag_name', '')).lstrip('v')}
+        except Exception:
+            c = {'때': time.time(), '판': c.get('판', '')}
+        with Lock():
+            s = load_json(SETF)
+            s['새판확인'] = c
+            write_json(SETF, s)
+    num = lambda v: tuple(int(x) for x in re.findall(r'\d+', v)[:3])
+    v = c.get('판', '')
+    return v if v and num(v) > num(VERSION) else None
+
+
 def serve():
     global TOKEN, PORT
     TOKEN = token()
@@ -1050,6 +1172,9 @@ def serve():
                     return
             except OSError:
                 pass
+            R = dict(REMOTE)
+            if R and time.time() - R['srv'].last > IDLE:
+                remote_off()
             if time.time() - LAST > IDLE:
                 srv.shutdown()
                 return
@@ -1057,6 +1182,7 @@ def serve():
     try:
         srv.serve_forever()
     finally:
+        remote_off()
         srv.server_close()
         if load_json(ST).get('pid') == os.getpid():
             os.remove(ST)
@@ -1137,6 +1263,9 @@ def main():
         subprocess.run(['/usr/libexec/PlistBuddy', '-c', f'Add :CFBundleIdentifier string {LABEL}-app', pb], capture_output=True)
         subprocess.run(['/usr/libexec/PlistBuddy', '-c', f'Set :CFBundleName {name}', pb], capture_output=True)
         subprocess.run(['codesign', '--force', '-s', '-', app], capture_output=True)
+        icon = os.path.join(os.path.dirname(os.path.dirname(me)), '앱아이콘.sh')
+        if os.path.isfile(icon):
+            subprocess.run(['/bin/zsh', icon, '피드백', app], capture_output=True)
         import plistlib
         os.makedirs(os.path.dirname(PLIST), exist_ok=True)
         with open(PLIST, 'wb') as f:
